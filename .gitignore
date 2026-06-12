@@ -1,0 +1,30 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Android Build artifacts
+build_out/
+*.apk
+*.apk.idsig
+debug.keystore
+
+# Icons and generated data (should be in ~/.local/share, not repo)
+# If any are in the root for some reason, ignore them
+icons/
+android_apps/
+
+# System / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Local configuration
+settings.json
+droidtux_settings.py.bak
