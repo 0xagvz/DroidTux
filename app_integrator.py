@@ -183,56 +183,69 @@ def scrape_playstore_icon(package, gui):
     except Exception: pass
     return None
 
-def extract_best_icon(apk_path, package, gui):
-    """Extrae el icono LEGACY PNG del APK buscando específicamente por nombre de recurso"""
+def extract_best_icon(serial, package, gui, temp_dir):
+    """Extrae el icono usando la App Puente si existe, o fallback local"""
     app_name = package.split('.')[-1].capitalize()
     
-    # Intentar Play Store primero para máxima calidad
-    web_icon = scrape_playstore_icon(package, gui)
+    # 1. INTENTO CON APP PUENTE (La forma profesional)
+    bridge_service = "com.droidtux.bridge/.IconService"
+    remote_path = f"/sdcard/Download/{package}.png"
     
-    a = None
-    icon_res_name = "ic_launcher" # Default
-    if APK:
-        try:
-            a = APK(apk_path)
-            app_name = a.get_app_name() or app_name
-            # Buscar el nombre del recurso de icono en el manifiesto
-            manifest_xml = a.get_android_manifest_axml().get_xml_obj()
-            icon_attr = manifest_xml.get('{http://schemas.android.com/apk/res/android}icon')
-            if icon_attr and '/' in icon_attr:
-                icon_res_name = icon_attr.split('/')[-1]
-        except: pass
+    # Intentar obtener el nombre real de la app via ADB primero
+    name_out = run_adb(f"-s {serial} shell \"dumpsys package {package} | grep -i 'label='\"")
+    if name_out:
+        # Extraer el valor de label=...
+        import re
+        match = re.search(r'label=([\w\s]+)', name_out)
+        if match: app_name = match.group(1).strip()
 
+    # Lanzar servicio de extracción de la App Puente
+    run_adb(f"-s {serial} shell am start-foreground-service -n {bridge_service} --es package {package}")
+    
+    # Esperar a que el archivo aparezca (máximo 2 segundos)
+    for _ in range(10):
+        time.sleep(0.2)
+        check = run_adb(f"-s {serial} shell ls {remote_path}")
+        if check and "No such file" not in check:
+            local_icon_path = os.path.join(temp_dir, f"{package}_bridge.png")
+            run_adb(f"-s {serial} pull {remote_path} {local_icon_path}")
+            if os.path.exists(local_icon_path):
+                with open(local_icon_path, 'rb') as f:
+                    return app_name, f.read()
+
+    # 2. FALLBACK: MÉTODO LOCAL (Si el bridge no está o falla)
+    web_icon = scrape_playstore_icon(package, gui)
     if web_icon: return app_name, web_icon
 
-    if a:
-        try:
-            import zipfile
-            with zipfile.ZipFile(apk_path, 'r') as z:
-                all_files = z.namelist()
-                # Prioridad de densidades (Legacy PNGs)
-                densities = ['xxxhdpi', 'xxhdpi', 'xhdpi', 'hdpi']
-                
-                # Búsqueda 1: Nombre exacto del recurso y PNG (evita XMLs adaptativos)
-                for d in densities:
-                    matches = [f for f in all_files if d in f and f.endswith('.png') and icon_res_name in f]
-                    if matches:
-                        best = sorted(matches, key=lambda x: z.getinfo(x).file_size)[-1]
-                        return app_name, z.read(best)
-                
-                # Búsqueda 2: Cualquier ic_launcher o icon PNG en alta densidad
-                for d in densities:
-                    matches = [f for f in all_files if d in d and f.endswith('.png') and ('ic_launcher' in f.lower() or 'icon' in f.lower())]
-                    if matches:
-                        best = sorted(matches, key=lambda x: z.getinfo(x).file_size)[-1]
-                        return app_name, z.read(best)
-                        
-                # Búsqueda 3: El PNG más grande del APK (último recurso)
-                pngs = [f for f in all_files if f.endswith('.png') and 'background' not in f.lower() and 'splash' not in f.lower()]
-                if pngs:
-                    best = sorted(pngs, key=lambda x: z.getinfo(x).file_size)[-1]
-                    return app_name, z.read(best)
-        except: pass
+    path_out = run_adb(f"-s {serial} shell pm path {package}")
+    if path_out:
+        apk_remote = path_out.splitlines()[0].replace("package:", "").strip()
+        apk_local = os.path.join(temp_dir, f"{package}.apk")
+        run_adb(f"-s {serial} pull {apk_remote} {apk_local}")
+        
+        a = None
+        icon_res_name = "ic_launcher"
+        if APK:
+            try:
+                a = APK(apk_local)
+                app_name = a.get_app_name() or app_name
+                manifest_xml = a.get_android_manifest_axml().get_xml_obj()
+                icon_attr = manifest_xml.get('{http://schemas.android.com/apk/res/android}icon')
+                if icon_attr and '/' in icon_attr: icon_res_name = icon_attr.split('/')[-1]
+            except: pass
+
+        if a:
+            try:
+                import zipfile
+                with zipfile.ZipFile(apk_local, 'r') as z:
+                    all_files = z.namelist()
+                    densities = ['xxxhdpi', 'xxhdpi', 'xhdpi', 'hdpi']
+                    for d in densities:
+                        matches = [f for f in all_files if d in f and f.endswith('.png') and icon_res_name in f and "anydpi" not in f]
+                        if matches:
+                            best = sorted(matches, key=lambda x: z.getinfo(x).file_size)[-1]
+                            return app_name, z.read(best)
+            except: pass
     return app_name, None
 
 def check_adb_status(gui):
@@ -284,21 +297,16 @@ def worker_integration(gui):
     with tempfile.TemporaryDirectory() as temp_dir:
         for i, pkg in enumerate(packages):
             gui.log(f"[{i+1}/{len(packages)}] {pkg}")
-            path_out = run_adb(f"-s {serial} shell pm path {pkg}")
-            if not path_out: continue
-            apk_remote = path_out.splitlines()[0].replace("package:", "").strip()
-            apk_local = os.path.join(temp_dir, f"{pkg}.apk")
-            run_adb(f"-s {serial} pull {apk_remote} {apk_local}")
-            if os.path.exists(apk_local):
-                name, icon = extract_best_icon(apk_local, pkg, gui)
-                icon_path = ICONS_DIR / f"{pkg}.png"
-                if icon:
-                    with open(icon_path, 'wb') as f: f.write(icon)
-                else: icon_path = "android"
+            name, icon = extract_best_icon(serial, pkg, gui, temp_dir)
+            icon_path = ICONS_DIR / f"{pkg}.png"
+            if icon:
+                with open(icon_path, 'wb') as f: f.write(icon)
+            else:
+                icon_path = "android"
                 
-                # PANTALLA VIRTUAL HORIZONTAL (16:9): Forzamos la resolución de la pantalla virtual y de la ventana
-                # HORIZONTAL VIRTUAL DISPLAY (16:9): Force both virtual display and window resolution
-                exec_cmd = f"{SCRCPY_PATH} -s {serial} --new-display=1280x720 --start-app={pkg} --window-title=\"{name}\" --orientation=0 --window-width=1280 --window-height=720"
+                # CALIDAD TOP 16:9 CORREGIDA: Sintaxis scrcpy 3.0+ es resolución/dpi
+                # TOP QUALITY 16:9 FIXED: scrcpy 3.0+ syntax is resolution/dpi
+                exec_cmd = f"{SCRCPY_PATH} -s {serial} --new-display=1280x720/240 --video-bit-rate=16M --start-app={pkg} --window-title=\"{name}\" --orientation=0 --window-width=1280 --window-height=720"
                 
                 content = f"[Desktop Entry]\nVersion=1.0\nType=Application\nName={name}\nExec={exec_cmd}\nIcon={icon_path}\nTerminal=false\nCategories=Utility;Phone;X-Android;\n"
                 (DESKTOP_DIR / f"droidtux-{pkg}.desktop").write_text(content)
