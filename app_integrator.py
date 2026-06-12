@@ -191,6 +191,12 @@ class DroidTuxApp(Gtk.Window):
                 time.sleep(2)
         
         self.log(f"Conectado a {serial}")
+        
+        # Evitar que el teléfono se suspenda
+        self.log("Configurando modo 'Stay Awake'...")
+        self.run_adb("shell svc power stayon usb", serial)
+        self.run_adb("shell wm dismiss-keyguard", serial)
+
         self.update_progress("Validando App Puente...", 0.2)
         
         bridge_pkg = "com.droidtux.bridge"
@@ -246,7 +252,7 @@ class DroidTuxApp(Gtk.Window):
             name = name_raw.split("=")[-1].strip() if "label=" in (name_raw or "") else pkg.split('.')[-1].capitalize()
             
             # Construir comando scrcpy con ajustes
-            scrcpy_args = f"-s {serial} --start-app={pkg} --window-title=\"{name}\" -m {res_w} -b {bitrate} --always-on-top"
+            scrcpy_args = f"-s {serial} --start-app={pkg} --window-title=\"{name}\" -m {res_w} -b {bitrate} --always-on-top --stay-awake --power-off-on-close"
             exec_cmd = f"scrcpy {scrcpy_args}"
             
             # Usar ruta absoluta para el icono
