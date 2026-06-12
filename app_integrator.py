@@ -296,9 +296,9 @@ def worker_integration(gui):
                     with open(icon_path, 'wb') as f: f.write(icon)
                 else: icon_path = "android"
                 
-                # ROTACIÓN CORREGIDA: Si SecondScreen está ON, el móvil YA ESTÁ en horizontal (1920x1080).
-                # No necesitamos --orientation=270, usamos --orientation=0 para respetar la rotación de SecondScreen.
-                exec_cmd = f"{SCRCPY_PATH} -s {serial} --new-display --start-app={pkg} --window-title=\"{name}\" --orientation=0 --window-width=1280 --window-height=720 --window-borderless"
+                # PANTALLA VIRTUAL HORIZONTAL (16:9): Forzamos la resolución de la pantalla virtual y de la ventana
+                # HORIZONTAL VIRTUAL DISPLAY (16:9): Force both virtual display and window resolution
+                exec_cmd = f"{SCRCPY_PATH} -s {serial} --new-display=1280x720 --start-app={pkg} --window-title=\"{name}\" --orientation=0 --window-width=1280 --window-height=720"
                 
                 content = f"[Desktop Entry]\nVersion=1.0\nType=Application\nName={name}\nExec={exec_cmd}\nIcon={icon_path}\nTerminal=false\nCategories=Utility;Phone;X-Android;\n"
                 (DESKTOP_DIR / f"droidtux-{pkg}.desktop").write_text(content)
