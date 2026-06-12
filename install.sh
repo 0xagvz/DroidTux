@@ -1,7 +1,7 @@
 #!/bin/bash
-# install.sh - Script de instalación para DroidTux
+# install.sh - Installation script for DroidTux
 
-# Salir inmediatamente si algún comando falla
+# Exit immediately if a command fails
 set -e
 
 USE_LN=false
@@ -11,13 +11,13 @@ for arg in "$@"; do
     fi
 done
 
-echo "=== Instalando DroidTux (Android App Integrator) ==="
+echo "=== Installing DroidTux (Android App Integrator) ==="
 if [ "$USE_LN" = true ]; then
-    echo "(!) Modo desarrollo activado: Se usarán enlaces simbólicos."
+    echo "(!) Development mode active: Symbolic links will be used."
 fi
 
-# 1. Comprobar e instalar dependencias del sistema
-echo "[1/4] Instalando dependencias del sistema (requiere pkexec)..."
+# 1. Check and install system dependencies
+echo "[1/4] Installing system dependencies (requires pkexec)..."
 if command -v apt-get >/dev/null; then
     pkexec apt-get update
     pkexec apt-get install -y scrcpy adb python3-pip python3-venv desktop-file-utils python3-tk
@@ -26,18 +26,18 @@ elif command -v dnf >/dev/null; then
 elif command -v pacman >/dev/null; then
     pkexec pacman -S --noconfirm scrcpy android-tools python-pip desktop-file-utils tk
 else
-    echo "Gestor de paquetes no soportado nativamente. Por favor, asegúrate de tener scrcpy, adb, python3 y venv."
+    echo "Unsupported package manager. Please ensure scrcpy, adb, python3, and venv are installed."
 fi
 
-# 2. Configurar el entorno virtual de Python
-echo "[2/4] Configurando el entorno virtual de Python..."
+# 2. Configure Python virtual environment
+echo "[2/4] Configuring Python virtual environment..."
 VENV_DIR="$HOME/.local/share/droidtux/venv"
 mkdir -p "$HOME/.local/share/droidtux"
 
 SYSTEM_PYTHON="/usr/bin/python3"
 
 if [ -d "$VENV_DIR" ]; then
-    echo "Limpiando entorno previo..."
+    echo "Cleaning previous environment..."
     rm -rf "$VENV_DIR"
 fi
 
@@ -45,19 +45,21 @@ $SYSTEM_PYTHON -m venv --system-site-packages "$VENV_DIR"
 "$VENV_DIR/bin/pip" install --upgrade pip wheel
 "$VENV_DIR/bin/pip" install "cryptography<47" androguard Pillow requests beautifulsoup4 fastapi uvicorn python-multipart jinja2
 
-# Instalar el script principal
+# Install scripts
 mkdir -p "$HOME/.local/bin"
 mkdir -p "$HOME/.local/share/icons"
 
-# Copiar el logo
+# Copy logo
 cp droidtux.png "$HOME/.local/share/icons/droidtux.png"
 
 if [ "$USE_LN" = true ]; then
-    echo "Creando enlaces simbólicos en ~/.local/bin/..."
+    echo "Creating symbolic links in ~/.local/bin/..."
+    rm -f "$HOME/.local/bin/app_integrator.py" "$HOME/.local/bin/droidtux_settings.py"
     ln -sf "$(pwd)/app_integrator.py" "$HOME/.local/bin/app_integrator.py"
     ln -sf "$(pwd)/droidtux_settings.py" "$HOME/.local/bin/droidtux_settings.py"
 else
-    echo "Copiando archivos a ~/.local/bin/..."
+    echo "Copying files to ~/.local/bin/..."
+    rm -f "$HOME/.local/bin/app_integrator.py" "$HOME/.local/bin/droidtux_settings.py"
     cp app_integrator.py "$HOME/.local/bin/app_integrator.py"
     cp droidtux_settings.py "$HOME/.local/bin/droidtux_settings.py"
     if [ -f "droidtux-bridge-final.apk" ]; then
@@ -67,29 +69,29 @@ fi
 chmod +x "$HOME/.local/bin/app_integrator.py"
 chmod +x "$HOME/.local/bin/droidtux_settings.py"
 
-# Crear accesos directos (.desktop)
+# Create desktop shortcuts (.desktop)
 mkdir -p "$HOME/.local/share/applications"
 
-# Desktop para el Dashboard de Sincronización (GUI)
+# Desktop Entry for Sync Dashboard
 cat > "$HOME/.local/share/applications/droidtux_sync.desktop" << EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
 Name=DroidTux Sync
-Comment=Sincroniza tus apps de Android
+Comment=Sync your Android apps
 Exec=$VENV_DIR/bin/python3 $HOME/.local/bin/app_integrator.py
 Icon=$HOME/.local/share/icons/droidtux.png
 Terminal=false
 Categories=Utility;
 EOF
 
-# Desktop para el Panel de Ajustes
+# Desktop Entry for Settings Panel
 cat > "$HOME/.local/share/applications/droidtux_settings.desktop" << EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=DroidTux Ajustes
-Comment=Configuración de DroidTux
+Name=DroidTux Settings
+Comment=Configure DroidTux
 Exec=$VENV_DIR/bin/python3 $HOME/.local/bin/droidtux_settings.py
 Icon=$HOME/.local/share/icons/droidtux.png
 Terminal=false
@@ -98,22 +100,21 @@ EOF
 
 update-desktop-database "$HOME/.local/share/applications"
 
-# 3. Crear el wrapper para Udev
-echo "[3/4] Configurando la integración con Udev y Systemd..."
+# 3. Create Udev wrapper
+echo "[3/4] Configuring Udev and Systemd integration..."
 WRAPPER_PATH="/usr/local/bin/android-integrator-trigger.sh"
 pkexec bash -c "cat > $WRAPPER_PATH" << 'EOF'
 #!/bin/bash
-# Encuentra los usuarios con sesión activa y lanza el servicio systemd de usuario
+# Find active sessions and launch user systemd service
 for uid in $(loginctl list-sessions --no-legend | awk '{print $2}'); do
     user=$(id -un "$uid")
-    # Capturamos DISPLAY y XAUTHORITY de la sesión del usuario para la GUI
+    # Capture DISPLAY and XAUTHORITY for GUI support
     display=$(sudo -u "$user" env | grep '^DISPLAY=' | cut -d= -f2-)
     xauthority=$(sudo -u "$user" env | grep '^XAUTHORITY=' | cut -d= -f2-)
     
     if [ -z "$display" ]; then display=":0"; fi
 
     if [ "$1" == "add" ]; then
-        # Usamos restart para asegurar que si el servicio estaba en un estado raro, se limpie y empiece de cero
         pkexec --user "$user" env DISPLAY="$display" XAUTHORITY="$xauthority" XDG_RUNTIME_DIR="/run/user/$uid" systemctl --user restart android-integrator.service
     elif [ "$1" == "remove" ]; then
         pkexec --user "$user" env XDG_RUNTIME_DIR="/run/user/$uid" systemctl --user stop android-integrator.service
@@ -122,16 +123,16 @@ done
 EOF
 pkexec chmod +x "$WRAPPER_PATH"
 
-# Instalar regla udev
+# Install udev rule
 pkexec cp "$(pwd)/99-android-integrator.rules" /etc/udev/rules.d/
 pkexec udevadm control --reload-rules
 pkexec udevadm trigger
 
-# 4. Instalar y habilitar servicio Systemd de usuario
-echo "[4/4] Instalando servicio Systemd..."
+# 4. Install and enable user Systemd service
+echo "[4/4] Installing Systemd service..."
 mkdir -p "$HOME/.config/systemd/user"
 if [ "$USE_LN" = true ]; then
-    echo "Creando enlace simbólico del servicio systemd..."
+    echo "Creating symbolic link for systemd service..."
     ln -sf "$(pwd)/android-integrator.service" "$HOME/.config/systemd/user/android-integrator.service"
 else
     cp android-integrator.service "$HOME/.config/systemd/user/"
@@ -140,5 +141,5 @@ fi
 systemctl --user daemon-reload
 systemctl --user enable android-integrator.service
 
-echo "=== Instalación completada con éxito ==="
-echo "DroidTux está listo. Al conectar tu dispositivo Android por USB (con Depuración USB activada), tus aplicaciones aparecerán automáticamente en tu menú."
+echo "=== Installation completed successfully ==="
+echo "DroidTux is ready. When you connect your Android device via USB (with USB Debugging enabled), your apps will automatically appear in your menu."

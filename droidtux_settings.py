@@ -36,7 +36,7 @@ def save_settings(settings):
 
 class DroidTuxSettingsApp(Gtk.Window):
     def __init__(self):
-        super().__init__(title="Ajustes de DroidTux")
+        super().__init__(title="DroidTux Settings")
         self.set_default_size(450, 600)
         self.set_position(Gtk.WindowPosition.CENTER)
         
@@ -58,8 +58,8 @@ class DroidTuxSettingsApp(Gtk.Window):
             img = Gtk.Image.new_from_pixbuf(pixbuf)
             vbox.pack_start(img, False, False, 0)
 
-        title = Gtk.Label(label="Panel de Control DroidTux")
-        title.set_markup("<span size='large' weight='bold'>Panel de Control DroidTux</span>")
+        title = Gtk.Label(label="DroidTux Control Panel")
+        title.set_markup("<span size='large' weight='bold'>DroidTux Control Panel</span>")
         vbox.pack_start(title, False, False, 10)
 
         grid = Gtk.Grid(column_spacing=15, row_spacing=15)
@@ -67,7 +67,7 @@ class DroidTuxSettingsApp(Gtk.Window):
         vbox.pack_start(grid, True, True, 0)
 
         # Resolution
-        grid.attach(Gtk.Label(label="Resolución:", xalign=1), 0, 0, 1, 1)
+        grid.attach(Gtk.Label(label="Resolution:", xalign=1), 0, 0, 1, 1)
         self.res_combo = Gtk.ComboBoxText()
         res_opts = ["1920x1080", "1600x900", "1280x720", "1024x576", "800x450"]
         for opt in res_opts: self.res_combo.append_text(opt)
@@ -75,7 +75,7 @@ class DroidTuxSettingsApp(Gtk.Window):
         grid.attach(self.res_combo, 1, 0, 1, 1)
 
         # DPI
-        grid.attach(Gtk.Label(label="DPI (Densidad):", xalign=1), 0, 1, 1, 1)
+        grid.attach(Gtk.Label(label="DPI (Density):", xalign=1), 0, 1, 1, 1)
         self.dpi_adj = Gtk.Adjustment(value=self.settings["dpi"], lower=120, upper=480, step_increment=10, page_increment=40, page_size=0)
         self.dpi_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.dpi_adj)
         self.dpi_scale.set_size_request(200, -1)
@@ -90,23 +90,23 @@ class DroidTuxSettingsApp(Gtk.Window):
         grid.attach(self.bit_combo, 1, 2, 1, 1)
 
         # Save Button
-        save_btn = Gtk.Button(label="GUARDAR CAMBIOS")
+        save_btn = Gtk.Button(label="SAVE CHANGES")
         save_btn.connect("clicked", self.on_save_clicked)
         save_btn.get_style_context().add_class("suggested-action")
         vbox.pack_start(save_btn, False, False, 10)
 
         # Help Buttons
-        help_label = Gtk.Label(label="Ayuda y Configuración")
-        help_label.set_markup("<span weight='bold'>Ayuda y Configuración</span>")
+        help_label = Gtk.Label(label="Help & Configuration")
+        help_label.set_markup("<span weight='bold'>Help & Configuration</span>")
         vbox.pack_start(help_label, False, False, 10)
 
         h_bbox = Gtk.ButtonBox(orientation=Gtk.Orientation.VERTICAL, spacing=5)
         vbox.pack_start(h_bbox, False, False, 0)
 
         btns = [
-            ("Depuración ADB", self.show_adb_help),
+            ("ADB Debugging", self.show_adb_help),
             ("SecondScreen", self.show_ss_help),
-            ("Instalación USB", self.show_usb_help)
+            ("USB Installation", self.show_usb_help)
         ]
         for label, cmd in btns:
             b = Gtk.Button(label=label)
@@ -120,8 +120,8 @@ class DroidTuxSettingsApp(Gtk.Window):
         save_settings(self.settings)
         
         dialog = Gtk.MessageDialog(transient_for=self, flags=0, message_type=Gtk.MessageType.INFO,
-                                  buttons=Gtk.ButtonsType.OK, text="Ajustes Guardados")
-        dialog.format_secondary_text("Se aplicarán en la próxima conexión.")
+                                  buttons=Gtk.ButtonsType.OK, text="Settings Saved")
+        dialog.format_secondary_text("Changes will be applied on next connection.")
         dialog.run()
         dialog.destroy()
 
@@ -133,21 +133,21 @@ class DroidTuxSettingsApp(Gtk.Window):
         dialog.destroy()
 
     def show_adb_help(self, btn):
-        self.show_help("Depuración ADB", 
-            "1. Ve a 'Ajustes' en tu móvil.\n"
-            "2. 'Información del teléfono' -> Pulsa 7 veces en 'Número de compilación'.\n"
-            "3. Vuelve atrás -> 'Sistema' -> 'Opciones de desarrollador'.\n"
-            "4. Activa 'Depuración por USB'.")
+        self.show_help("ADB Debugging", 
+            "1. Go to 'Settings' on your phone.\n"
+            "2. 'About phone' -> Tap 'Build number' 7 times.\n"
+            "3. Go back -> 'System' -> 'Developer options'.\n"
+            "4. Enable 'USB Debugging'.")
 
     def show_ss_help(self, btn):
         self.show_help("SecondScreen", 
-            "1. Instala SecondScreen desde la Play Store.\n"
-            "2. Crea un nuevo perfil llamado exactamente 'Linux'.\n"
-            "3. Configura la resolución a 1920x1080 y la densidad a 240.")
+            "1. Install SecondScreen from Play Store.\n"
+            "2. Create a new profile named exactly 'Linux'.\n"
+            "3. Set resolution to 1920x1080 and density to 240.")
 
     def show_usb_help(self, btn):
-        self.show_help("Instalación USB", 
-            "En móviles Xiaomi/MIUI:\n\n1. Opciones de desarrollador -> Activa 'Instalar vía USB'.\n2. Puede requerir Mi Account.")
+        self.show_help("USB Installation", 
+            "On Xiaomi/MIUI phones:\n\n1. Developer options -> Enable 'Install via USB'.\n2. May require Mi Account login.")
 
 if __name__ == "__main__":
     app = DroidTuxSettingsApp()
