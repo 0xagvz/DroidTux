@@ -10,8 +10,10 @@ import gi
 
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib, Pango, Gio, GdkPixbuf
+import sys
+import argparse
 
-# Configuración de Rutas
+# Path Configuration
 BASE_DIR = Path(__file__).resolve().parent
 ICONS_DIR = Path.home() / ".local/share/icons/android_apps"
 DESKTOP_DIR = Path.home() / ".local/share/applications"
@@ -21,11 +23,11 @@ BRIDGE_APK = BASE_DIR / "droidtux-bridge-final.apk"
 LOCAL_LOGO = BASE_DIR / "droidtux.png"
 LOGO_PATH = Path.home() / ".local/share/icons/droidtux.png"
 
-# Si no existe el logo en la ruta de iconos, usamos el local
+# Use local logo if system path doesn't exist
 if not LOGO_PATH.exists() and LOCAL_LOGO.exists():
     LOGO_PATH = LOCAL_LOGO
 
-# CSS para estilo nativo con espaciado
+# Native CSS Styling
 NORD_CSS = b"""
 .header { padding: 20px; border-bottom: 2px solid @theme_selected_bg_color; }
 .title { font-size: 24px; font-weight: bold; }
@@ -51,7 +53,7 @@ class DroidTuxApp(Gtk.Window):
         self.set_position(Gtk.WindowPosition.CENTER)
         self.settings = load_settings()
 
-        # Aplicar CSS
+        # Apply CSS
         style_provider = Gtk.CssProvider()
         style_provider.load_from_data(NORD_CSS)
         Gtk.StyleContext.add_provider_for_screen(
@@ -91,7 +93,7 @@ class DroidTuxApp(Gtk.Window):
         card.get_style_context().add_class("card")
         vbox.pack_start(card, True, True, 0)
 
-        self.status_label = Gtk.Label(label="Listo para sincronizar")
+        self.status_label = Gtk.Label(label="Ready to sync")
         self.status_label.set_halign(Gtk.Align.CENTER)
         card.pack_start(self.status_label, False, False, 0)
 
@@ -114,12 +116,12 @@ class DroidTuxApp(Gtk.Window):
         bbox.set_layout(Gtk.ButtonBoxStyle.SPREAD)
         card.pack_start(bbox, False, False, 10)
 
-        self.sync_btn = Gtk.Button(label="INICIAR SINCRONIZACIÓN")
+        self.sync_btn = Gtk.Button(label="START SYNC")
         self.sync_btn.get_style_context().add_class("suggested-action")
         self.sync_btn.connect("clicked", self.on_sync_clicked)
         bbox.pack_start(self.sync_btn, True, True, 0)
 
-        help_btn = Gtk.Button(label="AYUDA USB")
+        help_btn = Gtk.Button(label="USB HELP")
         help_btn.connect("clicked", self.show_usb_help)
         bbox.pack_start(help_btn, True, True, 0)
 
@@ -157,14 +159,14 @@ class DroidTuxApp(Gtk.Window):
             flags=0,
             message_type=Gtk.MessageType.INFO,
             buttons=Gtk.ButtonsType.OK,
-            text="Cómo habilitar 'Instalar vía USB'"
+            text="How to enable 'Install via USB'"
         )
         msg = (
-            "Si no ves la opción 'Instalar vía USB' en Opciones de Desarrollador:\n\n"
-            "1. XIAOMI / MIUI: Debes iniciar sesión en tu Mi Account y tener una tarjeta SIM insertada.\n"
-            "2. REALME / OPPO: Activa 'Instalación ADB'.\n"
-            "3. OTROS: Busca 'Permitir instalación de apps por ADB'.\n\n"
-            "Sin esto, DroidTux no puede obtener los iconos de alta calidad."
+            "If you don't see 'Install via USB' in Developer Options:\n\n"
+            "1. XIAOMI / MIUI: Log in to your Mi Account and insert a SIM card.\n"
+            "2. REALME / OPPO: Enable 'ADB Installation'.\n"
+            "3. OTHERS: Search for 'Allow app installation via ADB'.\n\n"
+            "DroidTux needs this for high-quality icons."
         )
         dialog.format_secondary_text(msg)
         dialog.run()
@@ -179,7 +181,7 @@ class DroidTuxApp(Gtk.Window):
         except Exception as e: return f"ERROR: {str(e)}"
 
     def run_sync(self):
-        self.update_progress("Buscando dispositivo...", 0.1)
+        self.update_progress("Searching for device...", 0.1)
         serial = None
         while not serial:
             output = self.run_adb("devices")
@@ -187,40 +189,40 @@ class DroidTuxApp(Gtk.Window):
             devs = [l.split()[0] for l in lines if "\tdevice" in l]
             if devs: serial = devs[0]
             else: 
-                self.log("Esperando dispositivo USB...")
+                self.log("Waiting for USB device...")
                 time.sleep(2)
         
-        self.log(f"Conectado a {serial}")
+        self.log(f"Connected to {serial}")
         
-        # Evitar que el teléfono se suspenda
-        self.log("Configurando modo 'Stay Awake'...")
+        # Prevent phone sleep
+        self.log("Setting 'Stay Awake' mode...")
         self.run_adb("shell svc power stayon usb", serial)
         self.run_adb("shell wm dismiss-keyguard", serial)
 
-        self.update_progress("Validando App Puente...", 0.2)
+        self.update_progress("Validating Bridge App...", 0.2)
         
         bridge_pkg = "com.droidtux.bridge"
         check = self.run_adb(f"shell pm list packages {bridge_pkg}", serial)
         if bridge_pkg not in check:
-            self.log("Instalando Bridge APK...")
+            self.log("Installing Bridge APK...")
             if BRIDGE_APK.exists():
                 res = self.run_adb(f"install -g {BRIDGE_APK}", serial)
                 if "INSTALL_FAILED_USER_RESTRICTED" in res:
-                    self.log("ERROR: Instalación USB bloqueada por el móvil.")
+                    self.log("ERROR: USB Installation blocked by phone.")
                     GLib.idle_add(self.show_usb_help, None)
-                    self.update_progress("Error: Habilita Instalación USB", 0)
+                    self.update_progress("Error: Enable USB Installation", 0)
                     GLib.idle_add(self.sync_btn.set_sensitive, True)
                     return
             else:
-                self.log("Error: No se encuentra el APK del Bridge.")
+                self.log("Error: Bridge APK not found.")
                 GLib.idle_add(self.sync_btn.set_sensitive, True)
                 return
 
-        self.update_progress("Sincronizando apps...", 0.4)
+        self.update_progress("Syncing apps...", 0.4)
         ICONS_DIR.mkdir(parents=True, exist_ok=True)
         DESKTOP_DIR.mkdir(parents=True, exist_ok=True)
         
-        # Cargar ajustes actuales antes de generar .desktop
+        # Load current settings
         self.settings = load_settings()
         resolution = self.settings.get("resolution", "1280x720")
         res_w = resolution.split('x')[0]
@@ -234,50 +236,42 @@ class DroidTuxApp(Gtk.Window):
 
         for i, pkg in enumerate(packages):
             perc = 0.4 + (0.5 * (i/len(packages)))
-            self.update_progress(f"Procesando {pkg}", perc)
-            self.log(f"Integrando: {pkg}")
+            self.update_progress(f"Processing {pkg}", perc)
+            self.log(f"Integrating: {pkg}")
             
-            # Limpiar archivos previos en el móvil
+            # Clean previous files on phone
             self.run_adb(f"shell \"rm /sdcard/Download/{pkg}.png /sdcard/Download/{pkg}.label 2>/dev/null\"", serial)
             
-            # Lanzar el bridge
+            # Launch bridge
             self.run_adb(f"shell am start-foreground-service -n com.droidtux.bridge/.IconService --es package {pkg}", serial)
             
             icon_path = ICONS_DIR / f"{pkg}.png"
-            name = pkg.split('.')[-1].capitalize() # Fallback inicial
+            name = pkg.split('.')[-1].capitalize() # Initial fallback
             
-            # Esperar a que el bridge genere los archivos (PNG y Label)
+            # Wait for files (PNG and Label)
             success = False
             for _ in range(20):
-                # Verificar si el PNG existe y tiene tamaño
                 size_raw = self.run_adb(f"shell stat -c %s /sdcard/Download/{pkg}.png 2>/dev/null", serial)
                 label_check = self.run_adb(f"shell ls /sdcard/Download/{pkg}.label 2>/dev/null", serial)
                 
                 if size_raw.isdigit() and int(size_raw) > 0 and pkg in label_check:
-                    # Descargar icono
                     self.run_adb(f"pull /sdcard/Download/{pkg}.png {icon_path}", serial)
-                    # Leer nombre real
                     name = self.run_adb(f"shell cat /sdcard/Download/{pkg}.label", serial)
                     success = True
                     break
                 time.sleep(0.2)
             
             if not success:
-                self.log(f"Advertencia: Falló extracción completa para {pkg}. Usando fallbacks.")
-                # Intentar al menos obtener el nombre si el PNG falló
+                self.log(f"Warning: Failed to extract icons for {pkg}. Using fallbacks.")
                 label_check = self.run_adb(f"shell cat /sdcard/Download/{pkg}.label 2>/dev/null", serial)
                 if label_check and "No such file" not in label_check:
                     name = label_check
                 
-                if not icon_path.exists():
-                    # Fallback a icono genérico de android si no hay nada
-                    icon_path_str = "android"
-                else:
-                    icon_path_str = str(icon_path.absolute())
+                icon_path_str = "android" if not icon_path.exists() else str(icon_path.absolute())
             else:
                 icon_path_str = str(icon_path.absolute())
 
-            # Construir comando scrcpy con ajustes y MULTI-DISPLAY
+            # Build scrcpy command with MULTI-DISPLAY
             scrcpy_args = (
                 f"-s {serial} --start-app={pkg} --window-title=\"{name}\" "
                 f"--new-display={resolution}/{dpi} -b {bitrate} "
@@ -288,32 +282,25 @@ class DroidTuxApp(Gtk.Window):
             content = f"[Desktop Entry]\nType=Application\nName={name}\nExec={exec_cmd}\nIcon={icon_path_str}\nTerminal=false\nCategories=X-Android;\n"
             (DESKTOP_DIR / f"dtapp-{pkg}.desktop").write_text(content)
 
-        # Opcional: Aplicar ajustes de densidad (DPI) al sistema principal si se desea
-        # Pero con --new-display, cada ventana ya tiene su propio DPI.
-        # self.run_adb(f"shell wm density {self.settings['dpi']}", serial)
-
         subprocess.run(["update-desktop-database", str(DESKTOP_DIR)], capture_output=True)
-        self.update_progress("Sincronización completa", 1.0)
-        self.log("¡Todo listo! Tus apps ya están en el menú.")
+        self.update_progress("Sync complete", 1.0)
+        self.log("All done! Your apps are in the menu.")
         if hasattr(self, 'sync_btn'):
             GLib.idle_add(self.sync_btn.set_sensitive, True)
 
-import sys
-import argparse
-
 def cleanup():
-    print("Limpiando aplicaciones de DroidTux...")
+    print("Cleaning DroidTux apps...")
     for f in DESKTOP_DIR.glob("dtapp-*.desktop"):
         f.unlink()
     if ICONS_DIR.exists():
         shutil.rmtree(ICONS_DIR)
     subprocess.run(["update-desktop-database", str(DESKTOP_DIR)], capture_output=True)
-    print("Limpieza completada.")
+    print("Cleanup complete.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="DroidTux Integrator")
-    parser.add_argument("--add", action="store_true", help="Sincronizar automáticamente")
-    parser.add_argument("--remove", action="store_true", help="Eliminar aplicaciones")
+    parser.add_argument("--add", action="store_true", help="Sync automatically")
+    parser.add_argument("--remove", action="store_true", help="Remove apps")
     args = parser.parse_args()
 
     if args.remove:
@@ -323,11 +310,7 @@ if __name__ == "__main__":
     app = DroidTuxApp()
     
     if args.add:
-        print("Iniciando sincronización automática...")
-        # Ejecutamos la lógica de sincronización en un hilo para no bloquear si hubiera GUI,
-        # pero en este caso simplemente llamamos a run_sync y cerramos.
-        # Para hacerlo bien sin GUI, run_sync no debería depender de widgets.
-        # Vamos a llamar a run_sync directamente.
+        print("Starting automatic sync...")
         app.run_sync()
         sys.exit(0)
     else:
