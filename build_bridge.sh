@@ -28,11 +28,20 @@ echo "[*] Limpiando entorno..."
 rm -rf "$BUILD_DIR" && mkdir -p "$BUILD_DIR/obj" "$BUILD_DIR/apk"
 
 echo "[*] Generando recursos..."
-aapt2 compile --dir res -o "$BUILD_DIR/res.zip" 2>/dev/null || mkdir -p res # Creamos carpeta res vacía si no existe
-aapt2 link "$BUILD_DIR/res.zip" -I "$ANDROID_JAR" \
-    --manifest "$SRC_DIR/AndroidManifest.xml" \
-    --java "$BUILD_DIR/gen" \
-    -o "$BUILD_DIR/base.apk"
+mkdir -p res
+if [ "$(ls -A res)" ]; then
+    aapt2 compile --dir res -o "$BUILD_DIR/res.zip"
+    aapt2 link "$BUILD_DIR/res.zip" -I "$ANDROID_JAR" \
+        --manifest "$SRC_DIR/AndroidManifest.xml" \
+        --java "$BUILD_DIR/gen" \
+        -o "$BUILD_DIR/base.apk"
+else
+    echo "[*] No se detectaron recursos, enlazando solo con el manifiesto..."
+    aapt2 link -I "$ANDROID_JAR" \
+        --manifest "$SRC_DIR/AndroidManifest.xml" \
+        --java "$BUILD_DIR/gen" \
+        -o "$BUILD_DIR/base.apk"
+fi
 
 echo "[*] Compilando Java..."
 javac -d "$BUILD_DIR/obj" \
