@@ -47,11 +47,18 @@ public class IconService extends Service {
 
             // Guardar en la carpeta pública (Download) para que ADB pueda hacer pull
             File outFile = new File("/sdcard/Download/" + pkg + ".png");
+            if (outFile.exists()) outFile.delete();
+            
             FileOutputStream out = new FileOutputStream(outFile);
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            out.flush();
+            out.getFD().sync();
             out.close();
             
-            Log.d(TAG, "Icono extraído con éxito para: " + pkg);
+            // Notificar al sistema de medios para que el archivo sea visible inmediatamente vía ADB
+            android.media.MediaScannerConnection.scanFile(this, new String[]{outFile.getAbsolutePath()}, null, null);
+            
+            Log.d(TAG, "Icono extraído con éxito para: " + pkg + " en " + outFile.length() + " bytes");
         } catch (Exception e) {
             Log.e(TAG, "Error extrayendo icono para " + pkg + ": " + e.getMessage());
         }
@@ -67,7 +74,10 @@ public class IconService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel("dt", "DroidTux", NotificationManager.IMPORTANCE_LOW);
             getSystemService(NotificationManager.class).createNotificationChannel(channel);
-            startForeground(1, new Notification.Builder(this, "dt").setContentTitle("Extrayendo icono...").build());
+            startForeground(1, new Notification.Builder(this, "dt")
+                .setContentTitle("Extrayendo icono...")
+                .setSmallIcon(android.R.drawable.ic_menu_save)
+                .build());
         }
     }
 }

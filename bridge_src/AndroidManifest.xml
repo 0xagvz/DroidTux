@@ -2,14 +2,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.droidtux.bridge">
 
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
+
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application android:label="DroidTux Bridge">
         <service
             android:name=".IconService"
             android:exported="true"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_TYPE" android:value="Extracts high quality app icons for Linux desktop integration." />
+        </service>
     </application>
 </manifest>

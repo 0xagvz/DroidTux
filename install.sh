@@ -30,12 +30,10 @@ else
 fi
 
 # 2. Configurar el entorno virtual de Python
-echo "[2/4] Configurando el entorno virtual de Python (forzando Python del sistema para soporte Tkinter)..."
+echo "[2/4] Configurando el entorno virtual de Python..."
 VENV_DIR="$HOME/.local/share/droidtux/venv"
 mkdir -p "$HOME/.local/share/droidtux"
 
-# Usamos el Python del sistema (/usr/bin/python3) porque el de Homebrew suele carecer de _tkinter
-# We use system Python because Homebrew's often lacks _tkinter
 SYSTEM_PYTHON="/usr/bin/python3"
 
 if [ -d "$VENV_DIR" ]; then
@@ -43,26 +41,59 @@ if [ -d "$VENV_DIR" ]; then
     rm -rf "$VENV_DIR"
 fi
 
-$SYSTEM_PYTHON -m venv "$VENV_DIR"
+$SYSTEM_PYTHON -m venv --system-site-packages "$VENV_DIR"
 "$VENV_DIR/bin/pip" install --upgrade pip wheel
-"$VENV_DIR/bin/pip" install androguard Pillow requests beautifulsoup4
-
-# Verificación rápida / Quick check
-if ! "$VENV_DIR/bin/python3" -c "import androguard" 2>/dev/null; then
-    echo "(!) Advertencia: androguard no se instaló correctamente. Intentando método alternativo..."
-    "$VENV_DIR/bin/pip" install --no-cache-dir androguard
-fi
+"$VENV_DIR/bin/pip" install androguard Pillow requests beautifulsoup4 fastapi uvicorn python-multipart jinja2
 
 # Instalar el script principal
 mkdir -p "$HOME/.local/bin"
+mkdir -p "$HOME/.local/share/icons"
+
+# Copiar el logo
+cp droidtux.png "$HOME/.local/share/icons/droidtux.png"
+
 if [ "$USE_LN" = true ]; then
-    echo "Creando enlace simbólico de app_integrator.py en ~/.local/bin/..."
+    echo "Creando enlaces simbólicos en ~/.local/bin/..."
     ln -sf "$(pwd)/app_integrator.py" "$HOME/.local/bin/app_integrator.py"
 else
-    echo "Copiando app_integrator.py a ~/.local/bin/..."
+    echo "Copiando archivos a ~/.local/bin/..."
     cp app_integrator.py "$HOME/.local/bin/app_integrator.py"
+    if [ -f "droidtux-bridge-final.apk" ]; then
+        cp droidtux-bridge-final.apk "$HOME/.local/bin/droidtux-bridge-final.apk"
+    fi
 fi
 chmod +x "$HOME/.local/bin/app_integrator.py"
+
+# Crear accesos directos (.desktop)
+mkdir -p "$HOME/.local/share/applications"
+
+# Desktop para el Dashboard Unificado (Sync + Ajustes)
+cat > "$HOME/.local/share/applications/droidtux-sync.desktop" << EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DroidTux Sync
+Comment=Sincroniza y configura tus apps de Android
+Exec=$VENV_DIR/bin/python3 $HOME/.local/bin/app_integrator.py --add
+Icon=$HOME/.local/share/icons/droidtux.png
+Terminal=false
+Categories=Utility;Settings;
+EOF
+
+# Redirigir Ajustes al mismo Dashboard
+cat > "$HOME/.local/share/applications/droidtux-settings.desktop" << EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DroidTux Ajustes
+Comment=Configuración avanzada de DroidTux
+Exec=$VENV_DIR/bin/python3 $HOME/.local/bin/app_integrator.py --add
+Icon=$HOME/.local/share/icons/droidtux.png
+Terminal=false
+Categories=Settings;
+EOF
+
+update-desktop-database "$HOME/.local/share/applications"
 
 # 3. Crear el wrapper para Udev
 echo "[3/4] Configurando la integración con Udev y Systemd..."
