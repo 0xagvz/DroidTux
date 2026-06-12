@@ -37,7 +37,9 @@ public class IconService extends Service {
     private void extractIcon(String pkg) {
         try {
             PackageManager pm = getPackageManager();
-            Drawable drawable = pm.getApplicationIcon(pkg);
+            ApplicationInfo appInfo = pm.getApplicationInfo(pkg, 0);
+            String label = pm.getApplicationLabel(appInfo).toString();
+            Drawable drawable = pm.getApplicationIcon(appInfo);
             
             // Renderizar el drawable a un Bitmap de 512x512
             Bitmap bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888);
@@ -45,22 +47,31 @@ public class IconService extends Service {
             drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
             drawable.draw(canvas);
 
-            // Guardar en la carpeta pública (Download) para que ADB pueda hacer pull
+            // Guardar el icono
             File outFile = new File("/sdcard/Download/" + pkg + ".png");
             if (outFile.exists()) outFile.delete();
-            
             FileOutputStream out = new FileOutputStream(outFile);
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
             out.flush();
             out.getFD().sync();
             out.close();
+
+            // Guardar el nombre real de la app
+            File labelFile = new File("/sdcard/Download/" + pkg + ".label");
+            if (labelFile.exists()) labelFile.delete();
+            FileOutputStream labelOut = new FileOutputStream(labelFile);
+            labelOut.write(label.getBytes("UTF-8"));
+            labelOut.flush();
+            labelOut.getFD().sync();
+            labelOut.close();
             
-            // Notificar al sistema de medios para que el archivo sea visible inmediatamente vía ADB
-            android.media.MediaScannerConnection.scanFile(this, new String[]{outFile.getAbsolutePath()}, null, null);
+            // Notificar al sistema de medios
+            android.media.MediaScannerConnection.scanFile(this, 
+                new String[]{outFile.getAbsolutePath(), labelFile.getAbsolutePath()}, null, null);
             
-            Log.d(TAG, "Icono extraído con éxito para: " + pkg + " en " + outFile.length() + " bytes");
+            Log.d(TAG, "Extraído con éxito: " + pkg + " (" + label + ")");
         } catch (Exception e) {
-            Log.e(TAG, "Error extrayendo icono para " + pkg + ": " + e.getMessage());
+            Log.e(TAG, "Error procesando " + pkg + ": " + e.getMessage());
         }
     }
 

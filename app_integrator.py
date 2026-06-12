@@ -222,7 +222,10 @@ class DroidTuxApp(Gtk.Window):
         
         # Cargar ajustes actuales antes de generar .desktop
         self.settings = load_settings()
-        res_w = self.settings.get("resolution", "1280x720").split('x')[0]
+        resolution = self.settings.get("resolution", "1280x720")
+        res_w = resolution.split('x')[0]
+        res_h = resolution.split('x')[1]
+        dpi = self.settings.get("dpi", 240)
         bitrate = self.settings.get("bitrate", "16M").lower()
 
         cmd = "shell \"cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER\""
@@ -234,34 +237,60 @@ class DroidTuxApp(Gtk.Window):
             self.update_progress(f"Procesando {pkg}", perc)
             self.log(f"Integrando: {pkg}")
             
-            # Extraer icono real usando el bridge (con reintentos)
-            self.run_adb(f"shell rm /sdcard/Download/{pkg}.png", serial)
+            # Limpiar archivos previos en el móvil
+            self.run_adb(f"shell \"rm /sdcard/Download/{pkg}.png /sdcard/Download/{pkg}.label 2>/dev/null\"", serial)
+            
+            # Lanzar el bridge
             self.run_adb(f"shell am start-foreground-service -n com.droidtux.bridge/.IconService --es package {pkg}", serial)
             
             icon_path = ICONS_DIR / f"{pkg}.png"
-            # Esperar a que el archivo aparezca y tenga tamaño (máximo 3 segundos)
-            for _ in range(15):
-                size_raw = self.run_adb(f"shell stat -c %s /sdcard/Download/{pkg}.png", serial)
-                if size_raw.isdigit() and int(size_raw) > 0:
+            name = pkg.split('.')[-1].capitalize() # Fallback inicial
+            
+            # Esperar a que el bridge genere los archivos (PNG y Label)
+            success = False
+            for _ in range(20):
+                # Verificar si el PNG existe y tiene tamaño
+                size_raw = self.run_adb(f"shell stat -c %s /sdcard/Download/{pkg}.png 2>/dev/null", serial)
+                label_check = self.run_adb(f"shell ls /sdcard/Download/{pkg}.label 2>/dev/null", serial)
+                
+                if size_raw.isdigit() and int(size_raw) > 0 and pkg in label_check:
+                    # Descargar icono
                     self.run_adb(f"pull /sdcard/Download/{pkg}.png {icon_path}", serial)
+                    # Leer nombre real
+                    name = self.run_adb(f"shell cat /sdcard/Download/{pkg}.label", serial)
+                    success = True
                     break
                 time.sleep(0.2)
             
-            # Obtener nombre real de la app
-            name_raw = self.run_adb(f"shell dumpsys package {pkg} | grep -i 'label=' | head -n 1", serial)
-            name = name_raw.split("=")[-1].strip() if "label=" in (name_raw or "") else pkg.split('.')[-1].capitalize()
-            
-            # Construir comando scrcpy con ajustes
-            scrcpy_args = f"-s {serial} --start-app={pkg} --window-title=\"{name}\" -m {res_w} -b {bitrate} --always-on-top --stay-awake --power-off-on-close"
+            if not success:
+                self.log(f"Advertencia: Falló extracción completa para {pkg}. Usando fallbacks.")
+                # Intentar al menos obtener el nombre si el PNG falló
+                label_check = self.run_adb(f"shell cat /sdcard/Download/{pkg}.label 2>/dev/null", serial)
+                if label_check and "No such file" not in label_check:
+                    name = label_check
+                
+                if not icon_path.exists():
+                    # Fallback a icono genérico de android si no hay nada
+                    icon_path_str = "android"
+                else:
+                    icon_path_str = str(icon_path.absolute())
+            else:
+                icon_path_str = str(icon_path.absolute())
+
+            # Construir comando scrcpy con ajustes y MULTI-DISPLAY
+            scrcpy_args = (
+                f"-s {serial} --start-app={pkg} --window-title=\"{name}\" "
+                f"--new-display={resolution}/{dpi} -b {bitrate} "
+                f"--always-on-top --stay-awake --power-off-on-close"
+            )
             exec_cmd = f"scrcpy {scrcpy_args}"
             
-            # Usar ruta absoluta para el icono
-            content = f"[Desktop Entry]\nType=Application\nName={name}\nExec={exec_cmd}\nIcon={icon_path.absolute()}\nTerminal=false\n"
-            (DESKTOP_DIR / f"droidtux-{pkg}.desktop").write_text(content)
+            content = f"[Desktop Entry]\nType=Application\nName={name}\nExec={exec_cmd}\nIcon={icon_path_str}\nTerminal=false\nCategories=X-Android;\n"
+            (DESKTOP_DIR / f"dtapp-{pkg}.desktop").write_text(content)
 
-        # Opcional: Aplicar resolución global si se usa SecondScreen o wm density
-        self.log("Aplicando ajustes de densidad (DPI)...")
-        self.run_adb(f"shell wm density {self.settings['dpi']}", serial)
+        # Opcional: Aplicar ajustes de densidad (DPI) al sistema principal si se desea
+        # Pero con --new-display, cada ventana ya tiene su propio DPI.
+        # self.run_adb(f"shell wm density {self.settings['dpi']}", serial)
 
         subprocess.run(["update-desktop-database", str(DESKTOP_DIR)], capture_output=True)
         self.update_progress("Sincronización completa", 1.0)
@@ -274,7 +303,7 @@ import argparse
 
 def cleanup():
     print("Limpiando aplicaciones de DroidTux...")
-    for f in DESKTOP_DIR.glob("droidtux-*.desktop"):
+    for f in DESKTOP_DIR.glob("dtapp-*.desktop"):
         f.unlink()
     if ICONS_DIR.exists():
         shutil.rmtree(ICONS_DIR)

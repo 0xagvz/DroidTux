@@ -43,7 +43,7 @@ fi
 
 $SYSTEM_PYTHON -m venv --system-site-packages "$VENV_DIR"
 "$VENV_DIR/bin/pip" install --upgrade pip wheel
-"$VENV_DIR/bin/pip" install androguard Pillow requests beautifulsoup4 fastapi uvicorn python-multipart jinja2
+"$VENV_DIR/bin/pip" install "cryptography<47" androguard Pillow requests beautifulsoup4 fastapi uvicorn python-multipart jinja2
 
 # Instalar el script principal
 mkdir -p "$HOME/.local/bin"
@@ -55,39 +55,42 @@ cp droidtux.png "$HOME/.local/share/icons/droidtux.png"
 if [ "$USE_LN" = true ]; then
     echo "Creando enlaces simbólicos en ~/.local/bin/..."
     ln -sf "$(pwd)/app_integrator.py" "$HOME/.local/bin/app_integrator.py"
+    ln -sf "$(pwd)/droidtux_settings.py" "$HOME/.local/bin/droidtux_settings.py"
 else
     echo "Copiando archivos a ~/.local/bin/..."
     cp app_integrator.py "$HOME/.local/bin/app_integrator.py"
+    cp droidtux_settings.py "$HOME/.local/bin/droidtux_settings.py"
     if [ -f "droidtux-bridge-final.apk" ]; then
         cp droidtux-bridge-final.apk "$HOME/.local/bin/droidtux-bridge-final.apk"
     fi
 fi
 chmod +x "$HOME/.local/bin/app_integrator.py"
+chmod +x "$HOME/.local/bin/droidtux_settings.py"
 
 # Crear accesos directos (.desktop)
 mkdir -p "$HOME/.local/share/applications"
 
-# Desktop para el Dashboard Unificado (Sync + Ajustes)
-cat > "$HOME/.local/share/applications/droidtux-sync.desktop" << EOF
+# Desktop para el Dashboard de Sincronización (GUI)
+cat > "$HOME/.local/share/applications/droidtux_sync.desktop" << EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
 Name=DroidTux Sync
-Comment=Sincroniza y configura tus apps de Android
-Exec=$VENV_DIR/bin/python3 $HOME/.local/bin/app_integrator.py --add
+Comment=Sincroniza tus apps de Android
+Exec=$VENV_DIR/bin/python3 $HOME/.local/bin/app_integrator.py
 Icon=$HOME/.local/share/icons/droidtux.png
 Terminal=false
-Categories=Utility;Settings;
+Categories=Utility;
 EOF
 
-# Redirigir Ajustes al mismo Dashboard
-cat > "$HOME/.local/share/applications/droidtux-settings.desktop" << EOF
+# Desktop para el Panel de Ajustes
+cat > "$HOME/.local/share/applications/droidtux_settings.desktop" << EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
 Name=DroidTux Ajustes
-Comment=Configuración avanzada de DroidTux
-Exec=$VENV_DIR/bin/python3 $HOME/.local/bin/app_integrator.py --add
+Comment=Configuración de DroidTux
+Exec=$VENV_DIR/bin/python3 $HOME/.local/bin/droidtux_settings.py
 Icon=$HOME/.local/share/icons/droidtux.png
 Terminal=false
 Categories=Settings;
