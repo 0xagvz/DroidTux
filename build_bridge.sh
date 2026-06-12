@@ -1,8 +1,24 @@
 #!/bin/bash
 set -e
 
-# Configuración de rutas
-SDK_PLATFORM="/usr/lib/android-sdk/platforms/android-34"
+# Intentar localizar Android SDK y Build Tools si no están en el PATH (útil para CI)
+if ! command -v aapt2 &> /dev/null; then
+    ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+    if [ -d "$ANDROID_SDK_ROOT/build-tools" ]; then
+        # Coger la versión más reciente de build-tools
+        LATEST_BUILD_TOOLS=$(ls -1 "$ANDROID_SDK_ROOT/build-tools" | sort -V | tail -n 1)
+        export PATH="$PATH:$ANDROID_SDK_ROOT/build-tools/$LATEST_BUILD_TOOLS"
+        echo "[*] Añadido al PATH: $ANDROID_SDK_ROOT/build-tools/$LATEST_BUILD_TOOLS"
+    fi
+fi
+
+# Verificar de nuevo
+if ! command -v aapt2 &> /dev/null; then
+    echo "[!] Error: No se pudo encontrar 'aapt2'. Asegúrate de tener instalado el Android SDK Build-Tools."
+    exit 1
+fi
+
+SDK_PLATFORM="${ANDROID_SDK_ROOT:-/usr/lib/android-sdk}/platforms/android-34"
 ANDROID_JAR="$SDK_PLATFORM/android.jar"
 BUILD_DIR="build_out"
 SRC_DIR="bridge_src"
