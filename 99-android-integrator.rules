@@ -1,0 +1,6 @@
+# 99-android-integrator.rules
+# Regla Udev para disparar el integrador cuando un dispositivo Android con ADB se conecta o desconecta.
+# Llama a un pequeño wrapper que notifica a las sesiones gráficas de los usuarios.
+
+ACTION=="add", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*ff4201*", RUN+="/usr/local/bin/android-integrator-trigger.sh add"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*ff4201*", RUN+="/usr/local/bin/android-integrator-trigger.sh remove"
