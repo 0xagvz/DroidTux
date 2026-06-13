@@ -47,11 +47,17 @@ def load_settings():
     return {"resolution": "1280x720", "dpi": 240, "bitrate": "16M"}
 
 class DroidTuxApp(Gtk.Window):
-    def __init__(self):
+    def __init__(self, automatic=False):
         super().__init__(title="DroidTux Dashboard")
         self.set_default_size(500, 700)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.settings = load_settings()
+        self.automatic = automatic
+        self.serial = None
+
+        if self.automatic:
+            self.set_decorated(False)
+            self.set_keep_above(True)
 
         # Apply CSS
         style_provider = Gtk.CssProvider()
@@ -180,6 +186,23 @@ class DroidTuxApp(Gtk.Window):
             return res.stdout.strip()
         except Exception as e: return f"ERROR: {str(e)}"
 
+    def watchdog(self):
+        print(f"[Watchdog] Monitoring device: {self.serial}")
+        while True:
+            time.sleep(5)
+            output = self.run_adb("devices")
+            # Look for serial with 'device' status
+            found = False
+            for line in output.splitlines():
+                if self.serial in line and "\tdevice" in line:
+                    found = True
+                    break
+            
+            if not found:
+                print(f"[Watchdog] Device {self.serial} disconnected. Cleaning up.")
+                cleanup()
+                os._exit(0)
+
     def run_sync(self):
         self.update_progress("Searching for device...", 0.1)
         serial = None
@@ -193,6 +216,7 @@ class DroidTuxApp(Gtk.Window):
                 time.sleep(2)
         
         self.log(f"Connected to {serial}")
+        self.serial = serial
         
         # Prevent phone sleep
         self.log("Setting 'Stay Awake' mode...")
@@ -211,11 +235,13 @@ class DroidTuxApp(Gtk.Window):
                     self.log("ERROR: USB Installation blocked by phone.")
                     GLib.idle_add(self.show_usb_help, None)
                     self.update_progress("Error: Enable USB Installation", 0)
-                    GLib.idle_add(self.sync_btn.set_sensitive, True)
+                    if not self.automatic:
+                        GLib.idle_add(self.sync_btn.set_sensitive, True)
                     return
             else:
                 self.log("Error: Bridge APK not found.")
-                GLib.idle_add(self.sync_btn.set_sensitive, True)
+                if not self.automatic:
+                    GLib.idle_add(self.sync_btn.set_sensitive, True)
                 return
 
         self.update_progress("Syncing apps...", 0.4)
@@ -280,20 +306,57 @@ class DroidTuxApp(Gtk.Window):
             exec_cmd = f"scrcpy {scrcpy_args}"
             
             content = f"[Desktop Entry]\nType=Application\nName={name}\nExec={exec_cmd}\nIcon={icon_path_str}\nTerminal=false\nCategories=X-Android;\n"
-            (DESKTOP_DIR / f"dtapp-{pkg}.desktop").write_text(content)
+            (DESKTOP_DIR / f"droidtux-{pkg}.desktop").write_text(content)
 
         subprocess.run(["update-desktop-database", str(DESKTOP_DIR)], capture_output=True)
         self.update_progress("Sync complete", 1.0)
         self.log("All done! Your apps are in the menu.")
-        if hasattr(self, 'sync_btn'):
-            GLib.idle_add(self.sync_btn.set_sensitive, True)
+        
+        if self.automatic:
+            time.sleep(2)
+            GLib.idle_add(self.hide)
+            # Start watchdog to clean up on disconnect
+            threading.Thread(target=self.watchdog, daemon=True).start()
+        else:
+            if hasattr(self, 'sync_btn'):
+                GLib.idle_add(self.sync_btn.set_sensitive, True)
 
 def cleanup():
     print("Cleaning DroidTux apps...")
-    for f in DESKTOP_DIR.glob("dtapp-*.desktop"):
-        f.unlink()
+    
+    # Clean from applications menu
+    prefixes = ["dtapp-*.desktop", "droidtux-*.desktop"]
+    for pattern in prefixes:
+        for f in DESKTOP_DIR.glob(pattern):
+            try:
+                f.unlink()
+                print(f"Removed: {f}")
+            except Exception as e:
+                print(f"Error removing {f}: {e}")
+
+    # Clean from actual Desktop (Escritorio)
+    desktop_folders = [Path.home() / "Desktop", Path.home() / "Escritorio"]
+    # Also try to get it from xdg-user-dir if available
+    try:
+        xdg_desktop = subprocess.check_output(["xdg-user-dir", "DESKTOP"], encoding='utf-8').strip()
+        if xdg_desktop:
+            desktop_folders.append(Path(xdg_desktop))
+    except:
+        pass
+
+    for folder in set(desktop_folders):
+        if folder.exists():
+            for pattern in prefixes:
+                for f in folder.glob(pattern):
+                    try:
+                        f.unlink()
+                        print(f"Removed from desktop: {f}")
+                    except Exception as e:
+                        print(f"Error removing {f} from desktop: {e}")
+
     if ICONS_DIR.exists():
         shutil.rmtree(ICONS_DIR)
+    
     subprocess.run(["update-desktop-database", str(DESKTOP_DIR)], capture_output=True)
     print("Cleanup complete.")
 
@@ -307,11 +370,11 @@ if __name__ == "__main__":
         cleanup()
         sys.exit(0)
     
-    app = DroidTuxApp()
+    app = DroidTuxApp(automatic=args.add)
     
     if args.add:
         print("Starting automatic sync...")
-        app.run_sync()
-        sys.exit(0)
+        threading.Thread(target=app.run_sync, daemon=True).start()
+        Gtk.main()
     else:
         Gtk.main()

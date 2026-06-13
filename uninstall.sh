@@ -24,8 +24,14 @@ systemctl --user daemon-reload
 # 4. Limpiar caché generada (.desktop e iconos)
 echo "[4/4] Limpiando archivos autogenerados por la app (basura)..."
 rm -rf "$HOME/.local/share/icons/android_apps"
-# Los desktop se creaban con el prefijo droidtux-
-find "$HOME/.local/share/applications" -name "droidtux-*.desktop" -type f -delete 2>/dev/null || true
+
+# Eliminar accesos directos de ambas ubicaciones posibles y con ambos prefijos
+for dir in "$HOME/.local/share/applications" "$HOME/Desktop" "$HOME/Escritorio" "$(xdg-user-dir DESKTOP 2>/dev/null)"; do
+    if [ -d "$dir" ]; then
+        find "$dir" -name "dtapp-*.desktop" -type f -delete 2>/dev/null || true
+        find "$dir" -name "droidtux-*.desktop" -type f -delete 2>/dev/null || true
+    fi
+done
 
 # Actualizar base de datos de aplicaciones si el comando existe
 if command -v update-desktop-database >/dev/null; then

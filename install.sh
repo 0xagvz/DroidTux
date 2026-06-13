@@ -50,20 +50,21 @@ mkdir -p "$HOME/.local/bin"
 mkdir -p "$HOME/.local/share/icons"
 
 # Copy logo
-cp droidtux.png "$HOME/.local/share/icons/droidtux.png"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cp "$SCRIPT_DIR/droidtux.png" "$HOME/.local/share/icons/droidtux.png"
 
 if [ "$USE_LN" = true ]; then
     echo "Creating symbolic links in ~/.local/bin/..."
     rm -f "$HOME/.local/bin/app_integrator.py" "$HOME/.local/bin/droidtux_settings.py"
-    ln -sf "$(pwd)/app_integrator.py" "$HOME/.local/bin/app_integrator.py"
-    ln -sf "$(pwd)/droidtux_settings.py" "$HOME/.local/bin/droidtux_settings.py"
+    ln -sf "$SCRIPT_DIR/app_integrator.py" "$HOME/.local/bin/app_integrator.py"
+    ln -sf "$SCRIPT_DIR/droidtux_settings.py" "$HOME/.local/bin/droidtux_settings.py"
 else
     echo "Copying files to ~/.local/bin/..."
     rm -f "$HOME/.local/bin/app_integrator.py" "$HOME/.local/bin/droidtux_settings.py"
-    cp app_integrator.py "$HOME/.local/bin/app_integrator.py"
-    cp droidtux_settings.py "$HOME/.local/bin/droidtux_settings.py"
-    if [ -f "droidtux-bridge-final.apk" ]; then
-        cp droidtux-bridge-final.apk "$HOME/.local/bin/droidtux-bridge-final.apk"
+    cp "$SCRIPT_DIR/app_integrator.py" "$HOME/.local/bin/app_integrator.py"
+    cp "$SCRIPT_DIR/droidtux_settings.py" "$HOME/.local/bin/droidtux_settings.py"
+    if [ -f "$SCRIPT_DIR/droidtux-bridge-final.apk" ]; then
+        cp "$SCRIPT_DIR/droidtux-bridge-final.apk" "$HOME/.local/bin/droidtux-bridge-final.apk"
     fi
 fi
 chmod +x "$HOME/.local/bin/app_integrator.py"
@@ -115,16 +116,16 @@ for uid in $(loginctl list-sessions --no-legend | awk '{print $2}'); do
     if [ -z "$display" ]; then display=":0"; fi
 
     if [ "$1" == "add" ]; then
-        pkexec --user "$user" env DISPLAY="$display" XAUTHORITY="$xauthority" XDG_RUNTIME_DIR="/run/user/$uid" systemctl --user restart android-integrator.service
+        pkexec --user "$user" env DISPLAY="$display" XAUTHORITY="$xauthority" XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user restart android-integrator.service
     elif [ "$1" == "remove" ]; then
-        pkexec --user "$user" env XDG_RUNTIME_DIR="/run/user/$uid" systemctl --user stop android-integrator.service
+        pkexec --user "$user" env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user stop android-integrator.service
     fi
 done
 EOF
 pkexec chmod +x "$WRAPPER_PATH"
 
 # Install udev rule
-pkexec cp "$(pwd)/99-android-integrator.rules" /etc/udev/rules.d/
+pkexec cp "$SCRIPT_DIR/99-android-integrator.rules" /etc/udev/rules.d/
 pkexec udevadm control --reload-rules
 pkexec udevadm trigger
 
@@ -133,13 +134,18 @@ echo "[4/4] Installing Systemd service..."
 mkdir -p "$HOME/.config/systemd/user"
 if [ "$USE_LN" = true ]; then
     echo "Creating symbolic link for systemd service..."
-    ln -sf "$(pwd)/android-integrator.service" "$HOME/.config/systemd/user/android-integrator.service"
+    ln -sf "$SCRIPT_DIR/android-integrator.service" "$HOME/.config/systemd/user/android-integrator.service"
 else
-    cp android-integrator.service "$HOME/.config/systemd/user/"
+    cp "$SCRIPT_DIR/android-integrator.service" "$HOME/.config/systemd/user/"
 fi
 
-systemctl --user daemon-reload
-systemctl --user enable android-integrator.service
+# Run daemon-reload and enable as the current user
+# We try to use the user who launched the script if possible
+REAL_USER="${PKEXEC_UID:-$UID}"
+USER_NAME=$(id -un "$REAL_USER")
+
+pkexec --user "$USER_NAME" env XDG_RUNTIME_DIR="/run/user/$REAL_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$REAL_USER/bus" systemctl --user daemon-reload
+pkexec --user "$USER_NAME" env XDG_RUNTIME_DIR="/run/user/$REAL_USER" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$REAL_USER/bus" systemctl --user enable android-integrator.service
 
 echo "=== Installation completed successfully ==="
 echo "DroidTux is ready. When you connect your Android device via USB (with USB Debugging enabled), your apps will automatically appear in your menu."
