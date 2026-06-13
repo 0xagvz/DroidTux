@@ -302,7 +302,7 @@ class DroidTuxApp(Gtk.Window):
             scrcpy_args = (
                 f"-s {serial} --start-app={pkg} --window-title=\"{name}\" "
                 f"--new-display={resolution}/{dpi} -b {bitrate} "
-                f"--always-on-top --stay-awake --power-off-on-close"
+                f"--always-on-top --stay-awake"
             )
             exec_cmd = f"scrcpy {scrcpy_args}"
             
