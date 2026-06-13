@@ -36,6 +36,8 @@ NORD_CSS = b"""
 .log-view { font-family: 'Monospace'; font-size: 12px; border-radius: 8px; }
 progressbar trough { border-radius: 5px; min-height: 10px; }
 progressbar progress { border-radius: 5px; }
+.splash-window { background-color: @theme_bg_color; border: 2px solid @theme_selected_bg_color; border-radius: 20px; }
+.splash-label { font-size: 13px; font-weight: normal; color: @theme_fg_color; }
 """
 
 def load_settings():
@@ -47,17 +49,13 @@ def load_settings():
     return {"resolution": "1280x720", "dpi": 240, "bitrate": "16M"}
 
 class DroidTuxApp(Gtk.Window):
-    def __init__(self, automatic=False):
+    def __init__(self):
         super().__init__(title="DroidTux Dashboard")
         self.set_default_size(500, 700)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.settings = load_settings()
-        self.automatic = automatic
         self.serial = None
-
-        if self.automatic:
-            self.set_decorated(False)
-            self.set_keep_above(True)
+        self.automatic = False
 
         # Apply CSS
         style_provider = Gtk.CssProvider()
@@ -135,6 +133,8 @@ class DroidTuxApp(Gtk.Window):
         print(f"[DroidTux] {message}")
         if hasattr(self, 'text_view'):
             GLib.idle_add(self._log_idle, message)
+        if hasattr(self, 'splash') and self.splash:
+            GLib.idle_add(self.splash.update_status, message)
 
     def _log_idle(self, message):
         buffer = self.text_view.get_buffer()
@@ -148,6 +148,8 @@ class DroidTuxApp(Gtk.Window):
         print(f"[Progress {int(fraction*100)}%] {text}")
         if hasattr(self, 'status_label'):
             GLib.idle_add(self._update_progress_idle, text, fraction)
+        if hasattr(self, 'splash') and self.splash:
+            GLib.idle_add(self.splash.update_progress, text, fraction)
 
     def _update_progress_idle(self, text, fraction):
         self.status_label.set_text(text)
@@ -191,7 +193,6 @@ class DroidTuxApp(Gtk.Window):
         while True:
             time.sleep(5)
             output = self.run_adb("devices")
-            # Look for serial with 'device' status
             found = False
             for line in output.splitlines():
                 if self.serial in line and "\tdevice" in line:
@@ -314,7 +315,7 @@ class DroidTuxApp(Gtk.Window):
         
         if self.automatic:
             time.sleep(2)
-            GLib.idle_add(self.hide)
+            GLib.idle_add(self.splash.hide)
             # Start watchdog to clean up on disconnect
             threading.Thread(target=self.watchdog, daemon=True).start()
         else:
@@ -323,42 +324,76 @@ class DroidTuxApp(Gtk.Window):
 
 def cleanup():
     print("Cleaning DroidTux apps...")
-    
-    # Clean from applications menu
     prefixes = ["dtapp-*.desktop", "droidtux-*.desktop"]
     for pattern in prefixes:
         for f in DESKTOP_DIR.glob(pattern):
             try:
                 f.unlink()
-                print(f"Removed: {f}")
-            except Exception as e:
-                print(f"Error removing {f}: {e}")
+            except: pass
 
-    # Clean from actual Desktop (Escritorio)
     desktop_folders = [Path.home() / "Desktop", Path.home() / "Escritorio"]
-    # Also try to get it from xdg-user-dir if available
     try:
         xdg_desktop = subprocess.check_output(["xdg-user-dir", "DESKTOP"], encoding='utf-8').strip()
-        if xdg_desktop:
-            desktop_folders.append(Path(xdg_desktop))
-    except:
-        pass
+        if xdg_desktop: desktop_folders.append(Path(xdg_desktop))
+    except: pass
 
     for folder in set(desktop_folders):
         if folder.exists():
             for pattern in prefixes:
                 for f in folder.glob(pattern):
-                    try:
-                        f.unlink()
-                        print(f"Removed from desktop: {f}")
-                    except Exception as e:
-                        print(f"Error removing {f} from desktop: {e}")
+                    try: f.unlink()
+                    except: pass
 
-    if ICONS_DIR.exists():
-        shutil.rmtree(ICONS_DIR)
-    
+    if ICONS_DIR.exists(): shutil.rmtree(ICONS_DIR)
     subprocess.run(["update-desktop-database", str(DESKTOP_DIR)], capture_output=True)
     print("Cleanup complete.")
+
+class DroidTuxSplash(Gtk.Window):
+    def __init__(self):
+        super().__init__(type=Gtk.WindowType.TOPLEVEL)
+        self.set_keep_above(True)
+        self.set_decorated(False)
+        self.set_resizable(False)
+        self.set_position(Gtk.WindowPosition.CENTER)
+        self.set_default_size(250, 200)
+        self.get_style_context().add_class("splash-window")
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=15)
+        vbox.set_valign(Gtk.Align.CENTER)
+        vbox.set_halign(Gtk.Align.CENTER)
+        vbox.set_margin_start(20)
+        vbox.set_margin_end(20)
+        vbox.set_margin_top(20)
+        vbox.set_margin_bottom(20)
+        self.add(vbox)
+
+        # Row 1: Logo
+        if LOGO_PATH.exists():
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(str(LOGO_PATH), 64, 64, True)
+            img = Gtk.Image.new_from_pixbuf(pixbuf)
+            vbox.pack_start(img, False, False, 0)
+
+        # Row 2: Spinner
+        self.spinner = Gtk.Spinner()
+        self.spinner.set_size_request(32, 32)
+        self.spinner.start()
+        vbox.pack_start(self.spinner, False, False, 0)
+
+        # Row 3: Status Label (Logs)
+        self.status_label = Gtk.Label(label="Initializing...")
+        self.status_label.get_style_context().add_class("splash-label")
+        self.status_label.set_ellipsize(Pango.EllipsizeMode.END)
+        self.status_label.set_max_width_chars(25)
+        self.status_label.set_halign(Gtk.Align.CENTER)
+        vbox.pack_start(self.status_label, False, False, 0)
+        
+        self.show_all()
+
+    def update_status(self, text):
+        self.status_label.set_text(text)
+
+    def update_progress(self, text, fraction):
+        self.status_label.set_text(text)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="DroidTux Integrator")
@@ -370,11 +405,14 @@ if __name__ == "__main__":
         cleanup()
         sys.exit(0)
     
-    app = DroidTuxApp(automatic=args.add)
-    
     if args.add:
-        print("Starting automatic sync...")
+        print("Starting automatic sync (Splash Mode)...")
+        app = DroidTuxApp()
+        app.automatic = True
+        app.hide() # Main window hidden
+        app.splash = DroidTuxSplash()
         threading.Thread(target=app.run_sync, daemon=True).start()
         Gtk.main()
     else:
+        app = DroidTuxApp()
         Gtk.main()
