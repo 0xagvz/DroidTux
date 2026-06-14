@@ -30,7 +30,23 @@ cp droidtux-bridge-final.apk "$STAGING_DIR/usr/local/share/droidtux/"
 cp droidtux.png "$STAGING_DIR/usr/local/share/droidtux/"
 cp droidtux.png "$STAGING_DIR/usr/share/icons/hicolor/512x512/apps/droidtux.png"
 cp 99-android-integrator.rules "$STAGING_DIR/etc/udev/rules.d/"
-cp android-integrator.service "$STAGING_DIR/usr/lib/systemd/user/"
+# Create system-specific systemd service for the package
+cat > "$STAGING_DIR/usr/lib/systemd/user/android-integrator.service" << EOF
+[Unit]
+Description=DroidTux - Integrador de Aplicaciones Android
+Documentation=https://github.com/nexu-io
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/app_integrator.py --add
+ExecStop=/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/app_integrator.py --remove
+KillMode=process
+TimeoutStopSec=5
+
+[Install]
+WantedBy=default.target
+EOF
 
 # Create the Trigger Wrapper script (Crucial for Udev)
 cat > "$STAGING_DIR/usr/local/bin/android-integrator-trigger.sh" << 'EOF'
@@ -38,15 +54,19 @@ cat > "$STAGING_DIR/usr/local/bin/android-integrator-trigger.sh" << 'EOF'
 # Find active sessions and launch user systemd service
 for uid in $(loginctl list-sessions --no-legend | awk '{print $2}'); do
     user=$(id -un "$uid")
-    # Capture DISPLAY and XAUTHORITY for GUI support
-    display=$(sudo -u "$user" env | grep '^DISPLAY=' | cut -d= -f2-)
-    xauthority=$(sudo -u "$user" env | grep '^XAUTHORITY=' | cut -d= -f2-)
     
-    if [ -z "$display" ]; then display=":0"; fi
+    # Better way to find DISPLAY and XAUTHORITY
+    # We look for a process owned by the user that has DISPLAY set
+    display=$(sudo -u "$user" env | grep '^DISPLAY=' | cut -d= -f2-)
+    if [ -z "$display" ]; then
+        # Fallback: check /proc for GUI processes
+        display=$(pgrep -u "$uid" -a gnome-session | grep -o 'DISPLAY=[^ ]*' | cut -d= -f2 | head -n1)
+        [ -z "$display" ] && display=$(pgrep -u "$uid" -a x-session-manager | grep -o 'DISPLAY=[^ ]*' | cut -d= -f2 | head -n1)
+        [ -z "$display" ] && display=":0"
+    fi
 
     if [ "$1" == "add" ]; then
-        # Use pkexec or direct systemctl if running as root from udev
-        sudo -u "$user" env DISPLAY="$display" XAUTHORITY="$xauthority" XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user restart android-integrator.service
+        sudo -u "$user" env DISPLAY="$display" XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user restart android-integrator.service
     elif [ "$1" == "remove" ]; then
         sudo -u "$user" env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user stop android-integrator.service
     fi
