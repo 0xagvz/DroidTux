@@ -25,8 +25,8 @@ rm -rf "$HOME/.local/share/droidtux"
 
 # 4. Limpiar caché de iconos, archivos .desktop y fuentes APT
 echo "[4/4] Limpiando iconos, accesos y fuentes APT..."
-pkexec rm -f /etc/apt/sources.list.d/droidtux.list
-pkexec rm -f /usr/share/keyrings/droidtux-archive-keyring.gpg
+pkexec rm -f /etc/apt/sources.list.d/inled.list
+pkexec rm -f /usr/share/keyrings/inled-archive-keyring.gpg
 rm -rf "$HOME/.local/share/icons/android_apps"
 
 # Buscar y borrar en aplicaciones y escritorios

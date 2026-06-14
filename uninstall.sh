@@ -12,8 +12,8 @@ systemctl --user disable android-integrator.service || true
 echo "[2/4] Eliminando reglas udev, scripts y repo APT..."
 pkexec rm -f /etc/udev/rules.d/99-android-integrator.rules
 pkexec rm -f /usr/local/bin/android-integrator-trigger.sh
-pkexec rm -f /etc/apt/sources.list.d/droidtux.list
-pkexec rm -f /usr/share/keyrings/droidtux-archive-keyring.gpg
+pkexec rm -f /etc/apt/sources.list.d/inled.list
+pkexec rm -f /usr/share/keyrings/inled-archive-keyring.gpg
 pkexec udevadm control --reload-rules
 
 # 3. Eliminar archivos y entorno del usuario

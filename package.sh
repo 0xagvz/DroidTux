@@ -95,7 +95,7 @@ if [ -d /etc/apt/sources.list.d ]; then
     curl -fsSL https://apt.inled.es/archive.key | gpg --dearmor -o "$KEYRING" || \
     wget -qO- https://apt.inled.es/archive.key | gpg --dearmor -o "$KEYRING"
     
-    echo "deb [signed-by=$KEYRING] https://apt.inled.es/ /" > /etc/apt/sources.list.d/droidtux.list
+    echo "deb [signed-by=$KEYRING] https://apt.inled.es/ /" > /etc/apt/sources.list.d/inled.list
 fi
 
 # Update desktop and icon databases
@@ -111,8 +111,8 @@ EOF
 cat > "$BUILD_DIR/after-remove.sh" << 'EOF'
 #!/bin/bash
 # Cleanup APT repository configuration
-rm -f /etc/apt/sources.list.d/droidtux.list
-rm -f /usr/share/keyrings/droidtux-archive-keyring.gpg
+rm -f /etc/apt/sources.list.d/inled.list
+rm -f /usr/share/keyrings/inled-archive-keyring.gpg
 
 # Update desktop and icon databases
 if command -v update-desktop-database >/dev/null; then
@@ -139,3 +139,4 @@ fpm -s dir -t rpm -n droidtux -v "$VERSION" \
     -C "$STAGING_DIR" .
 
 echo "[+] Packaging complete!"
+mplete!"
