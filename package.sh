@@ -32,6 +32,28 @@ cp droidtux.png "$STAGING_DIR/usr/share/icons/hicolor/512x512/apps/droidtux.png"
 cp 99-android-integrator.rules "$STAGING_DIR/etc/udev/rules.d/"
 cp android-integrator.service "$STAGING_DIR/usr/lib/systemd/user/"
 
+# Create the Trigger Wrapper script (Crucial for Udev)
+cat > "$STAGING_DIR/usr/local/bin/android-integrator-trigger.sh" << 'EOF'
+#!/bin/bash
+# Find active sessions and launch user systemd service
+for uid in $(loginctl list-sessions --no-legend | awk '{print $2}'); do
+    user=$(id -un "$uid")
+    # Capture DISPLAY and XAUTHORITY for GUI support
+    display=$(sudo -u "$user" env | grep '^DISPLAY=' | cut -d= -f2-)
+    xauthority=$(sudo -u "$user" env | grep '^XAUTHORITY=' | cut -d= -f2-)
+    
+    if [ -z "$display" ]; then display=":0"; fi
+
+    if [ "$1" == "add" ]; then
+        # Use pkexec or direct systemctl if running as root from udev
+        sudo -u "$user" env DISPLAY="$display" XAUTHORITY="$xauthority" XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user restart android-integrator.service
+    elif [ "$1" == "remove" ]; then
+        sudo -u "$user" env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user stop android-integrator.service
+    fi
+done
+EOF
+chmod +x "$STAGING_DIR/usr/local/bin/android-integrator-trigger.sh"
+
 # Create desktop entries for the package
 cat > "$STAGING_DIR/usr/share/applications/droidtux_sync.desktop" << EOF
 [Desktop Entry]
@@ -110,6 +132,11 @@ EOF
 # Prepare after-remove script for cleanup
 cat > "$BUILD_DIR/after-remove.sh" << 'EOF'
 #!/bin/bash
+# Cleanup system files
+rm -f /usr/local/bin/android-integrator-trigger.sh
+rm -f /etc/udev/rules.d/99-android-integrator.rules
+udevadm control --reload-rules
+
 # Cleanup APT repository configuration
 rm -f /etc/apt/sources.list.d/inled.list
 rm -f /usr/share/keyrings/inled-archive-keyring.gpg
@@ -128,15 +155,14 @@ echo "[*] Building .deb package..."
 fpm -s dir -t deb -n droidtux -v "$VERSION" \
     --after-install "$BUILD_DIR/after-install.sh" \
     --after-remove "$BUILD_DIR/after-remove.sh" \
-    --depends scrcpy --depends adb --depends python3-venv --depends python3-gi --depends python3-tk --depends curl --depends gnupg \
+    --depends scrcpy --depends adb --depends python3-venv --depends python3-gi --depends python3-tk --depends curl --depends gnupg --depends sudo \
     -C "$STAGING_DIR" .
 
 echo "[*] Building .rpm package..."
 fpm -s dir -t rpm -n droidtux -v "$VERSION" \
     --after-install "$BUILD_DIR/after-install.sh" \
     --after-remove "$BUILD_DIR/after-remove.sh" \
-    --depends scrcpy --depends android-tools --depends python3-venv --depends python3-gobject --depends python3-tkinter --depends curl --depends gnupg \
+    --depends scrcpy --depends android-tools --depends python3-venv --depends python3-gobject --depends python3-tkinter --depends curl --depends gnupg --depends sudo \
     -C "$STAGING_DIR" .
 
 echo "[+] Packaging complete!"
-mplete!"
