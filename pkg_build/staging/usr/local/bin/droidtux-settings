@@ -1,0 +1,2 @@
+#!/bin/bash
+/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/droidtux_settings.py "$@"

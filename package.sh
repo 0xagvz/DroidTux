@@ -30,6 +30,7 @@ cp droidtux-bridge-final.apk "$STAGING_DIR/usr/local/share/droidtux/"
 cp droidtux.png "$STAGING_DIR/usr/local/share/droidtux/"
 cp droidtux.png "$STAGING_DIR/usr/share/icons/hicolor/512x512/apps/droidtux.png"
 cp 99-android-integrator.rules "$STAGING_DIR/etc/udev/rules.d/"
+
 # Create system-specific systemd service for the package
 cat > "$STAGING_DIR/usr/lib/systemd/user/android-integrator.service" << EOF
 [Unit]
@@ -48,26 +49,32 @@ TimeoutStopSec=5
 WantedBy=default.target
 EOF
 
-# Create the Trigger Wrapper script (Crucial for Udev)
+# Create the Trigger Wrapper script with LOGGING
 cat > "$STAGING_DIR/usr/local/bin/android-integrator-trigger.sh" << 'EOF'
 #!/bin/bash
+# Log execution
+exec &> >(logger -t droidtux-trigger)
+echo "Trigger called with argument: $1"
+
 # Find active sessions and launch user systemd service
 for uid in $(loginctl list-sessions --no-legend | awk '{print $2}'); do
     user=$(id -un "$uid")
+    echo "Processing session for user: $user (UID: $uid)"
     
-    # Better way to find DISPLAY and XAUTHORITY
-    # We look for a process owned by the user that has DISPLAY set
+    # Better way to find DISPLAY
     display=$(sudo -u "$user" env | grep '^DISPLAY=' | cut -d= -f2-)
     if [ -z "$display" ]; then
-        # Fallback: check /proc for GUI processes
         display=$(pgrep -u "$uid" -a gnome-session | grep -o 'DISPLAY=[^ ]*' | cut -d= -f2 | head -n1)
         [ -z "$display" ] && display=$(pgrep -u "$uid" -a x-session-manager | grep -o 'DISPLAY=[^ ]*' | cut -d= -f2 | head -n1)
         [ -z "$display" ] && display=":0"
     fi
+    echo "Found DISPLAY: $display"
 
     if [ "$1" == "add" ]; then
+        echo "Restarting service for $user..."
         sudo -u "$user" env DISPLAY="$display" XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user restart android-integrator.service
     elif [ "$1" == "remove" ]; then
+        echo "Stopping service for $user..."
         sudo -u "$user" env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user stop android-integrator.service
     fi
 done
@@ -113,7 +120,7 @@ EOF
 chmod +x "$STAGING_DIR/usr/local/bin/droidtux-sync"
 chmod +x "$STAGING_DIR/usr/local/bin/droidtux-settings"
 
-# Prepare after-install script for venv setup and APT repo
+# Prepare after-install script
 cat > "$BUILD_DIR/after-install.sh" << 'EOF'
 #!/bin/bash
 set -e
@@ -126,63 +133,44 @@ fi
 "$VENV_DIR/bin/pip" install --upgrade pip wheel
 "$VENV_DIR/bin/pip" install "cryptography<47" androguard Pillow requests beautifulsoup4 fastapi uvicorn python-multipart jinja2
 
-# Setup Udev rules
+# Force Udev rules (in case the package manager didn't install them correctly)
+cp /usr/local/share/droidtux/99-android-integrator.rules /etc/udev/rules.d/ 2>/dev/null || true
 udevadm control --reload-rules && udevadm trigger
 
-# Setup APT Repository (apt.inled.es) with GPG key
+# Setup APT Repository
 if [ -d /etc/apt/sources.list.d ]; then
     echo "Configuring DroidTux APT repository..."
     KEYRING="/usr/share/keyrings/inled-archive-keyring.gpg"
-    # Download and convert GPG key to binary format for signed-by
     curl -fsSL https://apt.inled.es/archive.key | gpg --dearmor -o "$KEYRING" || \
     wget -qO- https://apt.inled.es/archive.key | gpg --dearmor -o "$KEYRING"
-    
     echo "deb [signed-by=$KEYRING] https://apt.inled.es stable main" > /etc/apt/sources.list.d/inled.list
 fi
 
-# Update desktop and icon databases
-if command -v update-desktop-database >/dev/null; then
-    update-desktop-database /usr/share/applications
-fi
-if command -v gtk-update-icon-cache >/dev/null; then
-    gtk-update-icon-cache -f -t /usr/share/icons/hicolor
-fi
+# Update databases
+update-desktop-database /usr/share/applications || true
+gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
 EOF
 
-# Prepare after-remove script for cleanup
+# Prepare after-remove script
 cat > "$BUILD_DIR/after-remove.sh" << 'EOF'
 #!/bin/bash
-# Cleanup system files
 rm -f /usr/local/bin/android-integrator-trigger.sh
 rm -f /etc/udev/rules.d/99-android-integrator.rules
 udevadm control --reload-rules
-
-# Cleanup APT repository configuration
 rm -f /etc/apt/sources.list.d/inled.list
 rm -f /usr/share/keyrings/inled-archive-keyring.gpg
-
-# Update desktop and icon databases
-if command -v update-desktop-database >/dev/null; then
-    update-desktop-database /usr/share/applications
-fi
-if command -v gtk-update-icon-cache >/dev/null; then
-    gtk-update-icon-cache -f -t /usr/share/icons/hicolor
-fi
+update-desktop-database /usr/share/applications || true
 EOF
 
-# 3. Build Packages using FPM
+# Add a backup of the udev rules inside /usr/local/share/droidtux/ for the after-install script
+cp 99-android-integrator.rules "$STAGING_DIR/usr/local/share/droidtux/"
+
+# 3. Build Packages
 echo "[*] Building .deb package..."
 fpm -s dir -t deb -n droidtux -v "$VERSION" \
     --after-install "$BUILD_DIR/after-install.sh" \
     --after-remove "$BUILD_DIR/after-remove.sh" \
     --depends scrcpy --depends adb --depends python3-venv --depends python3-gi --depends python3-tk --depends curl --depends gnupg --depends sudo \
-    -C "$STAGING_DIR" .
-
-echo "[*] Building .rpm package..."
-fpm -s dir -t rpm -n droidtux -v "$VERSION" \
-    --after-install "$BUILD_DIR/after-install.sh" \
-    --after-remove "$BUILD_DIR/after-remove.sh" \
-    --depends scrcpy --depends android-tools --depends python3-venv --depends python3-gobject --depends python3-tkinter --depends curl --depends gnupg --depends sudo \
     -C "$STAGING_DIR" .
 
 echo "[+] Packaging complete!"
