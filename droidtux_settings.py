@@ -9,11 +9,20 @@ from pathlib import Path
 SETTINGS_DIR = Path.home() / ".config/droidtux"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 BASE_DIR = Path(__file__).resolve().parent
-LOCAL_LOGO = BASE_DIR / "droidtux.png"
-LOGO_PATH = Path.home() / ".local/share/icons/droidtux.png"
 
-if not LOGO_PATH.exists() and LOCAL_LOGO.exists():
-    LOGO_PATH = LOCAL_LOGO
+# Search for logo in multiple locations
+LOGO_SEARCH_PATHS = [
+    Path.home() / ".local/share/icons/droidtux.png",
+    BASE_DIR / "droidtux.png",
+    Path("/usr/share/icons/hicolor/512x512/apps/droidtux.png"),
+    Path("/usr/local/share/icons/droidtux.png")
+]
+
+LOGO_PATH = None
+for p in LOGO_SEARCH_PATHS:
+    if p.exists():
+        LOGO_PATH = p
+        break
 
 DEFAULT_SETTINGS = {
     "resolution": "1280x720",
@@ -39,6 +48,9 @@ class DroidTuxSettingsApp(Gtk.Window):
         super().__init__(title="DroidTux Settings")
         self.set_default_size(450, 600)
         self.set_position(Gtk.WindowPosition.CENTER)
+        
+        if LOGO_PATH:
+            self.set_icon_from_file(str(LOGO_PATH))
         
         self.settings = load_settings()
         self.setup_ui()

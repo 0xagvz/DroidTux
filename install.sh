@@ -20,7 +20,7 @@ fi
 echo "[1/4] Installing system dependencies (requires pkexec)..."
 if command -v apt-get >/dev/null; then
     pkexec apt-get update
-    pkexec apt-get install -y scrcpy adb python3-pip python3-venv desktop-file-utils python3-tk
+    pkexec apt-get install -y scrcpy adb python3-pip python3-venv desktop-file-utils python3-tk curl gnupg
 elif command -v dnf >/dev/null; then
     pkexec dnf install -y scrcpy android-tools python3-pip desktop-file-utils python3-tkinter
 elif command -v pacman >/dev/null; then

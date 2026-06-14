@@ -20,12 +20,20 @@ DESKTOP_DIR = Path.home() / ".local/share/applications"
 SETTINGS_DIR = Path.home() / ".config/droidtux"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 BRIDGE_APK = BASE_DIR / "droidtux-bridge-final.apk"
-LOCAL_LOGO = BASE_DIR / "droidtux.png"
-LOGO_PATH = Path.home() / ".local/share/icons/droidtux.png"
 
-# Use local logo if system path doesn't exist
-if not LOGO_PATH.exists() and LOCAL_LOGO.exists():
-    LOGO_PATH = LOCAL_LOGO
+# Search for logo in multiple locations
+LOGO_SEARCH_PATHS = [
+    Path.home() / ".local/share/icons/droidtux.png",
+    BASE_DIR / "droidtux.png",
+    Path("/usr/share/icons/hicolor/512x512/apps/droidtux.png"),
+    Path("/usr/local/share/icons/droidtux.png")
+]
+
+LOGO_PATH = None
+for p in LOGO_SEARCH_PATHS:
+    if p.exists():
+        LOGO_PATH = p
+        break
 
 # Native CSS Styling
 NORD_CSS = b"""
@@ -53,6 +61,10 @@ class DroidTuxApp(Gtk.Window):
         super().__init__(title="DroidTux Dashboard")
         self.set_default_size(500, 700)
         self.set_position(Gtk.WindowPosition.CENTER)
+        
+        if LOGO_PATH:
+            self.set_icon_from_file(str(LOGO_PATH))
+        
         self.settings = load_settings()
         self.serial = None
         self.automatic = False
