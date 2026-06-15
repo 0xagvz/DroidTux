@@ -47,8 +47,17 @@ public class IconService extends Service {
             drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
             drawable.draw(canvas);
 
+            // Obtener directorio seguro (Scoped Storage compatible)
+            File baseDir = getExternalFilesDir(null);
+            if (baseDir == null) {
+                baseDir = new File("/sdcard/Download");
+            }
+            if (!baseDir.exists()) {
+                baseDir.mkdirs();
+            }
+
             // Guardar el icono
-            File outFile = new File("/sdcard/Download/" + pkg + ".png");
+            File outFile = new File(baseDir, pkg + ".png");
             if (outFile.exists()) outFile.delete();
             FileOutputStream out = new FileOutputStream(outFile);
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
@@ -57,7 +66,7 @@ public class IconService extends Service {
             out.close();
 
             // Guardar el nombre real de la app
-            File labelFile = new File("/sdcard/Download/" + pkg + ".label");
+            File labelFile = new File(baseDir, pkg + ".label");
             if (labelFile.exists()) labelFile.delete();
             FileOutputStream labelOut = new FileOutputStream(labelFile);
             labelOut.write(label.getBytes("UTF-8"));
@@ -69,7 +78,7 @@ public class IconService extends Service {
             android.media.MediaScannerConnection.scanFile(this, 
                 new String[]{outFile.getAbsolutePath(), labelFile.getAbsolutePath()}, null, null);
             
-            Log.d(TAG, "Extraído con éxito: " + pkg + " (" + label + ")");
+            Log.d(TAG, "Extraído con éxito en " + baseDir.getAbsolutePath() + ": " + pkg + " (" + label + ")");
         } catch (Exception e) {
             Log.e(TAG, "Error procesando " + pkg + ": " + e.getMessage());
         }

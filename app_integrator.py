@@ -239,23 +239,23 @@ class DroidTuxApp(Gtk.Window):
         self.update_progress("Validating Bridge App...", 0.2)
         
         bridge_pkg = "com.droidtux.bridge"
-        check = self.run_adb(f"shell pm list packages {bridge_pkg}", serial)
-        if bridge_pkg not in check:
-            self.log("Installing Bridge APK...")
-            if BRIDGE_APK.exists():
-                res = self.run_adb(f"install -g {BRIDGE_APK}", serial)
-                if "INSTALL_FAILED_USER_RESTRICTED" in res:
-                    self.log("ERROR: USB Installation blocked by phone.")
-                    GLib.idle_add(self.show_usb_help, None)
-                    self.update_progress("Error: Enable USB Installation", 0)
-                    if not self.automatic:
-                        GLib.idle_add(self.sync_btn.set_sensitive, True)
-                    return
-            else:
-                self.log("Error: Bridge APK not found.")
+        self.log("Ensuring Bridge APK is installed and up to date...")
+        if BRIDGE_APK.exists():
+            res = self.run_adb(f"install -r -g {BRIDGE_APK}", serial)
+            if "INSTALL_FAILED_USER_RESTRICTED" in res:
+                self.log("ERROR: USB Installation blocked by phone.")
+                GLib.idle_add(self.show_usb_help, None)
+                self.update_progress("Error: Enable USB Installation", 0)
                 if not self.automatic:
                     GLib.idle_add(self.sync_btn.set_sensitive, True)
                 return
+            elif "ERROR:" in res:
+                self.log(f"Warning: Bridge installation might have failed: {res}")
+        else:
+            self.log("Error: Bridge APK not found.")
+            if not self.automatic:
+                GLib.idle_add(self.sync_btn.set_sensitive, True)
+            return
 
         self.update_progress("Syncing apps...", 0.4)
         ICONS_DIR.mkdir(parents=True, exist_ok=True)
@@ -273,13 +273,16 @@ class DroidTuxApp(Gtk.Window):
         pkgs_raw = self.run_adb(cmd, serial)
         packages = list(set([l.split("/")[0].strip() for l in pkgs_raw.splitlines() if "/" in l]))
 
+        BRIDGE_REMOTE_DIR = "/sdcard/Android/data/com.droidtux.bridge/files"
+        
         for i, pkg in enumerate(packages):
             perc = 0.4 + (0.5 * (i/len(packages)))
             self.update_progress(f"Processing {pkg}", perc)
             self.log(f"Integrating: {pkg}")
             
-            # Clean previous files on phone
+            # Clean previous files on phone (using both old and new paths for safety)
             self.run_adb(f"shell \"rm /sdcard/Download/{pkg}.png /sdcard/Download/{pkg}.label 2>/dev/null\"", serial)
+            self.run_adb(f"shell \"rm {BRIDGE_REMOTE_DIR}/{pkg}.png {BRIDGE_REMOTE_DIR}/{pkg}.label 2>/dev/null\"", serial)
             
             # Launch bridge
             self.run_adb(f"shell am start-foreground-service -n com.droidtux.bridge/.IconService --es package {pkg}", serial)
@@ -290,20 +293,22 @@ class DroidTuxApp(Gtk.Window):
             # Wait for files (PNG and Label)
             success = False
             for _ in range(20):
-                size_raw = self.run_adb(f"shell stat -c %s /sdcard/Download/{pkg}.png 2>/dev/null", serial)
-                label_check = self.run_adb(f"shell ls /sdcard/Download/{pkg}.label 2>/dev/null", serial)
+                size_raw = self.run_adb(f"shell stat -c %s {BRIDGE_REMOTE_DIR}/{pkg}.png 2>/dev/null", serial)
+                label_check = self.run_adb(f"shell ls {BRIDGE_REMOTE_DIR}/{pkg}.label 2>/dev/null", serial)
                 
                 if size_raw.isdigit() and int(size_raw) > 0 and pkg in label_check:
-                    self.run_adb(f"pull /sdcard/Download/{pkg}.png {icon_path}", serial)
-                    name = self.run_adb(f"shell cat /sdcard/Download/{pkg}.label", serial)
+                    self.run_adb(f"pull {BRIDGE_REMOTE_DIR}/{pkg}.png {icon_path}", serial)
+                    name_raw = self.run_adb(f"shell cat {BRIDGE_REMOTE_DIR}/{pkg}.label", serial)
+                    if not name_raw.startswith("ERROR:"):
+                        name = name_raw
                     success = True
                     break
                 time.sleep(0.2)
             
             if not success:
                 self.log(f"Warning: Failed to extract icons for {pkg}. Using fallbacks.")
-                label_check = self.run_adb(f"shell cat /sdcard/Download/{pkg}.label 2>/dev/null", serial)
-                if label_check and "No such file" not in label_check:
+                label_check = self.run_adb(f"shell cat {BRIDGE_REMOTE_DIR}/{pkg}.label 2>/dev/null", serial)
+                if label_check and "No such file" not in label_check and not label_check.startswith("ERROR:"):
                     name = label_check
                 
                 icon_path_str = "android" if not icon_path.exists() else str(icon_path.absolute())
