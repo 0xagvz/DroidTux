@@ -97,4 +97,4 @@ To manually compile the Android bridge, you need the Android SDK (aapt2, d8, apk
 
 ---
 *Developed with ❤️ by JaimeGH.*
-*vreadme1.2*
+*vreadme1.2.1*
