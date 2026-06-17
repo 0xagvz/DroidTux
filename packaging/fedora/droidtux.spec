@@ -135,6 +135,19 @@ fi
 "$VENV_DIR/bin/pip" install --upgrade pip wheel
 "$VENV_DIR/bin/pip" install "cryptography<47" androguard Pillow requests beautifulsoup4 fastapi uvicorn python-multipart jinja2
 
+# Setup RPM Repository
+if [ -d /etc/yum.repos.d ]; then
+    echo "Configuring DroidTux RPM repository..."
+    cat > /etc/yum.repos.d/inled.repo << EOF
+[inled]
+name=Inled Repository
+baseurl=https://apt.inled.es/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://apt.inled.es/archive.key
+EOF
+fi
+
 # Reload udev
 udevadm control --reload-rules && udevadm trigger
 

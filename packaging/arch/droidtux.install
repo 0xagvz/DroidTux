@@ -8,7 +8,18 @@ post_install() {
   fi
   
   "$VENV_DIR/bin/pip" install --upgrade pip wheel
-  "$VENV_DIR/bin/pip" install "cryptography<47" androguard Pillow requests beautifulsoup4 fastapi uvicorn python-multipart jinja2
+  # Configure Pacman Repository
+  # Configurar repositorio de Pacman
+  if [ -f /etc/pacman.conf ] && ! grep -q "\[inled\]" /etc/pacman.conf; then
+      echo ">>> Configuring DroidTux Pacman repository in /etc/pacman.conf..."
+      echo ">>> Configurando repositorio de Pacman en /etc/pacman.conf..."
+      cat >> /etc/pacman.conf << EOF
+
+[inled]
+SigLevel = Optional TrustAll
+Server = https://apt.inled.es/arch/
+EOF
+  fi
 
   # Reload udev rules
   # Recargar reglas de udev
