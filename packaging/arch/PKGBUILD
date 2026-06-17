@@ -1,6 +1,5 @@
 # PKGBUILD for DroidTux
-# Maintainer: Jaime <jaime@example.com>
-# Contributor: Gemini CLI
+# Maintainer: Jaime <hi@inled.es>
 
 pkgname=droidtux
 pkgver=1.0.0
@@ -8,7 +7,7 @@ pkgrel=1
 pkgdesc="Android Desktop Integrator - Seamlessly integrate Android apps into your Linux desktop"
 pkgdesc_es="Integrador de Aplicaciones Android - Integra tus aplicaciones de Android en tu escritorio Linux"
 arch=('any')
-url="https://github.com/nexu-io"
+url="https://github.com/InledGroup/DroidTux
 license=('MIT')
 depends=('scrcpy' 'android-tools' 'python' 'python-gobject' 'tk' 'curl' 'gnupg' 'sudo')
 makedepends=('python-pip' 'python-setuptools')
@@ -40,7 +39,7 @@ package() {
   cp "$srcdir/droidtux_settings.py" "$pkgdir/usr/local/share/droidtux/"
   cp "$srcdir/droidtux.png" "$pkgdir/usr/local/share/droidtux/"
   cp "$srcdir/99-android-integrator.rules" "$pkgdir/usr/local/share/droidtux/"
-  
+
   # Copy icons and rules
   # Copiar iconos y reglas
   cp "$srcdir/droidtux.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/droidtux.png"
