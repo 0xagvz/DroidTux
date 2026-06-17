@@ -190,11 +190,14 @@ build_package() {
     fpm_cmd=(fpm -s dir -t "$target" -n droidtux -v "$VERSION" \
         --after-install "$BUILD_DIR/after-install.sh" \
         --after-remove "$BUILD_DIR/after-remove.sh" \
-        -C "$STAGING_DIR" .)
+        -C "$STAGING_DIR")
     
     for dep in "${deps[@]}"; do
         fpm_cmd+=("--depends" "$dep")
     done
+    
+    # The source path must be the last argument
+    fpm_cmd+=(".")
     
     "${fpm_cmd[@]}"
 }
