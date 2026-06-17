@@ -67,25 +67,41 @@ jobs:
     if: always() && !cancelled() && needs.build-and-release.result == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger APT Repo Update
+      - name: Trigger Repo Update
         run: |
           VERSION="${{ needs.build-and-release.outputs.version }}"
-          DEB_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/droidtux_${VERSION}_amd64.deb"
+          BASE_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}"
+          
+          # Nombres de archivo generados por fpm
+          DEB_FILE="droidtux_${VERSION}_amd64.deb"
+          RPM_FILE="droidtux-${VERSION}-1.noarch.rpm"
+          ARCH_FILE="droidtux-${VERSION}-1-any.pkg.tar.zst"
+          
+          DEB_URL="${BASE_URL}/${DEB_FILE}"
+          RPM_URL="${BASE_URL}/${RPM_FILE}"
+          ARCH_URL="${BASE_URL}/${ARCH_FILE}"
           
           echo "Target Version: $VERSION"
-          echo "Checking if artifact exists at $DEB_URL..."
+          echo "Checking artifacts..."
           
-          # Wait a few seconds for GitHub to finish processing the release assets
-          sleep 15
+          sleep 20
           
-          if curl --output /dev/null --silent --head --fail "$DEB_URL"; then
-            echo "Artifact found! Triggering update at InledGroup/apt..."
-            curl -X POST \
-              -H "Accept: application/vnd.github.v3+json" \
-              -H "Authorization: token ${{ secrets.APT_REPO_TOKEN }}" \
-              https://api.github.com/repos/InledGroup/apt/dispatches \
-              -d "{\"event_type\": \"package_upload\", \"client_payload\": {\"deb_url\": \"$DEB_URL\"}}"
-          else
-            echo "ERROR: Artifact not found at $DEB_URL. APT update skipped."
-            exit 1
-          fi
+          # Verificar los 3 archivos
+          for URL in "$DEB_URL" "$RPM_URL" "$ARCH_URL"; do
+            if ! curl --output /dev/null --silent --head --fail "$URL"; then
+              echo "ERROR: Artifact not found at $URL"
+              exit 1
+            fi
+          done
+
+          echo "All artifacts found! Triggering update at InledGroup/apt..."
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.APT_REPO_TOKEN }}" \
+            https://api.github.com/repos/InledGroup/apt/dispatches \
+            -d "{\"event_type\": \"package_upload\", \"client_payload\": {
+                  \"deb_url\": \"$DEB_URL\",
+                  \"rpm_url\": \"$RPM_URL\",
+                  \"arch_url\": \"$ARCH_URL\",
+                  \"version\": \"$VERSION\"
+                }}"
