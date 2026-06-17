@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ruby ruby-dev build-essential zip rpm
+          sudo apt-get install -y ruby ruby-dev build-essential zip rpm bsdtar
           sudo gem install --no-document fpm
 
       - name: Build Bridge APK
@@ -42,7 +42,7 @@ jobs:
           chmod +x build_bridge.sh
           ./build_bridge.sh
 
-      - name: Package .deb and .rpm
+      - name: Package DroidTux (DEB, RPM, Arch)
         run: |
           chmod +x package.sh
           ./package.sh ${{ steps.vars.outputs.version }}
@@ -58,6 +58,7 @@ jobs:
             droidtux-bridge-final.apk
             *.deb
             *.rpm
+            *.pkg.tar.zst
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

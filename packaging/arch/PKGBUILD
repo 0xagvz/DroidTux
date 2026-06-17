@@ -1,0 +1,115 @@
+# PKGBUILD for DroidTux
+# Maintainer: Jaime <jaime@example.com>
+# Contributor: Gemini CLI
+
+pkgname=droidtux
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Android Desktop Integrator - Seamlessly integrate Android apps into your Linux desktop"
+pkgdesc_es="Integrador de Aplicaciones Android - Integra tus aplicaciones de Android en tu escritorio Linux"
+arch=('any')
+url="https://github.com/nexu-io"
+license=('MIT')
+depends=('scrcpy' 'android-tools' 'python' 'python-gobject' 'tk' 'curl' 'gnupg' 'sudo')
+makedepends=('python-pip' 'python-setuptools')
+install=droidtux.install
+
+# We use the local files for building the package
+source=("app_integrator.py"
+        "droidtux_settings.py"
+        "droidtux.png"
+        "99-android-integrator.rules"
+        "android-integrator.service")
+
+# Skip checksums for local files in this context
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+  # Create directories
+  # Crear directorios
+  mkdir -p "$pkgdir/usr/local/share/droidtux"
+  mkdir -p "$pkgdir/usr/local/bin"
+  mkdir -p "$pkgdir/usr/share/icons/hicolor/512x512/apps"
+  mkdir -p "$pkgdir/etc/udev/rules.d"
+  mkdir -p "$pkgdir/usr/share/applications"
+  mkdir -p "$pkgdir/usr/lib/systemd/user"
+
+  # Copy main files
+  # Copiar archivos principales
+  cp "$srcdir/app_integrator.py" "$pkgdir/usr/local/share/droidtux/"
+  cp "$srcdir/droidtux_settings.py" "$pkgdir/usr/local/share/droidtux/"
+  cp "$srcdir/droidtux.png" "$pkgdir/usr/local/share/droidtux/"
+  cp "$srcdir/99-android-integrator.rules" "$pkgdir/usr/local/share/droidtux/"
+  
+  # Copy icons and rules
+  # Copiar iconos y reglas
+  cp "$srcdir/droidtux.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/droidtux.png"
+  cp "$srcdir/99-android-integrator.rules" "$pkgdir/etc/udev/rules.d/"
+
+  # Install systemd service
+  # Instalar servicio de systemd
+  cp "$srcdir/android-integrator.service" "$pkgdir/usr/lib/systemd/user/"
+
+  # Create trigger script
+  # Crear script disparador
+  cat > "$pkgdir/usr/local/bin/android-integrator-trigger.sh" << 'EOF'
+#!/bin/bash
+# Log execution
+exec &> >(logger -t droidtux-trigger)
+echo "Trigger called with argument: $1"
+
+for uid in $(loginctl list-sessions --no-legend | awk '{print $2}'); do
+    user=$(id -un "$uid")
+    display=$(sudo -u "$user" env | grep '^DISPLAY=' | cut -d= -f2-)
+    if [ -z "$display" ]; then
+        display=$(pgrep -u "$uid" -a gnome-session | grep -o 'DISPLAY=[^ ]*' | cut -d= -f2 | head -n1)
+        [ -z "$display" ] && display=":0"
+    fi
+
+    if [ "$1" == "add" ]; then
+        sudo -u "$user" env DISPLAY="$display" XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user restart android-integrator.service
+    elif [ "$1" == "remove" ]; then
+        sudo -u "$user" env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user stop android-integrator.service
+    fi
+done
+EOF
+  chmod +x "$pkgdir/usr/local/bin/android-integrator-trigger.sh"
+
+  # Create wrapper scripts
+  # Crear scripts envoltorios
+  cat > "$pkgdir/usr/local/bin/droidtux-sync" << 'EOF'
+#!/bin/bash
+/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/app_integrator.py "$@"
+EOF
+  cat > "$pkgdir/usr/local/bin/droidtux-settings" << 'EOF'
+#!/bin/bash
+/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/droidtux_settings.py "$@"
+EOF
+  chmod +x "$pkgdir/usr/local/bin/droidtux-sync"
+  chmod +x "$pkgdir/usr/local/bin/droidtux-settings"
+
+  # Desktop entries
+  # Entradas de escritorio
+  cat > "$pkgdir/usr/share/applications/droidtux_sync.desktop" << EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DroidTux Sync
+Comment=Sync your Android apps
+Exec=/usr/local/bin/droidtux-sync
+Icon=droidtux
+Terminal=false
+Categories=Utility;
+EOF
+  cat > "$pkgdir/usr/share/applications/droidtux_settings.desktop" << EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DroidTux Settings
+Comment=Configure DroidTux
+Exec=/usr/local/bin/droidtux-settings
+Icon=droidtux
+Terminal=false
+Categories=Settings;
+EOF
+}

@@ -166,11 +166,47 @@ EOF
 cp 99-android-integrator.rules "$STAGING_DIR/usr/local/share/droidtux/"
 
 # 3. Build Packages
-echo "[*] Building .deb package..."
-fpm -s dir -t deb -n droidtux -v "$VERSION" \
-    --after-install "$BUILD_DIR/after-install.sh" \
-    --after-remove "$BUILD_DIR/after-remove.sh" \
-    --depends scrcpy --depends adb --depends python3-venv --depends python3-gi --depends python3-tk --depends curl --depends gnupg --depends sudo \
-    -C "$STAGING_DIR" .
+echo "[*] Building packages..."
+
+# Dependencies mapping
+DEB_DEPS=(
+    "scrcpy" "adb" "python3-venv" "python3-gi" "python3-tk" "curl" "gnupg" "sudo"
+)
+
+RPM_DEPS=(
+    "scrcpy" "android-tools" "python3" "python3-gobject" "python3-tkinter" "curl" "gnupg2" "sudo"
+)
+
+PACMAN_DEPS=(
+    "scrcpy" "android-tools" "python" "python-gobject" "tk" "curl" "gnupg" "sudo"
+)
+
+build_package() {
+    local target=$1
+    local deps=("${@:2}")
+    
+    echo "[*] Generating $target package..."
+    
+    fpm_cmd=(fpm -s dir -t "$target" -n droidtux -v "$VERSION" \
+        --after-install "$BUILD_DIR/after-install.sh" \
+        --after-remove "$BUILD_DIR/after-remove.sh" \
+        -C "$STAGING_DIR" .)
+    
+    for dep in "${deps[@]}"; do
+        fpm_cmd+=("--depends" "$dep")
+    done
+    
+    "${fpm_cmd[@]}"
+}
+
+# Build for Debian
+build_package "deb" "${DEB_DEPS[@]}"
+
+# Build for Fedora (RPM)
+build_package "rpm" "${RPM_DEPS[@]}"
+
+# Build for Arch Linux (Pacman)
+# Note: fpm might need 'bsdtar' and 'zstd' installed for pacman target
+build_package "pacman" "${PACMAN_DEPS[@]}"
 
 echo "[+] Packaging complete!"

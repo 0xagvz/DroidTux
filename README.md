@@ -72,6 +72,22 @@ DroidTux is a tool designed to seamlessly integrate your Android applications di
    ./install.sh
    ```
 
+### 📦 Packages (Debian, Fedora, Arch Linux)
+You can generate native packages for your distribution using the `package.sh` script. This script requires `fpm`:
+```bash
+./package.sh [version]
+```
+This will generate `.deb`, `.rpm`, and `.pkg.tar.zst` files in the root directory.
+
+You can also find the native definition files in the `packaging/` folder:
+- **Arch Linux:** `packaging/arch/PKGBUILD`
+- **Fedora:** `packaging/fedora/droidtux.spec`
+
+To uninstall the package version:
+- Debian: `./uninstall_deb.sh`
+- Fedora: `./uninstall_rpm.sh`
+- Arch Linux: `./uninstall_pacman.sh`
+
 ### 🛠️ Development
 To manually compile the Android bridge, you need the Android SDK (aapt2, d8, apksigner, etc.) and run:
 ```bash
@@ -80,4 +96,6 @@ To manually compile the Android bridge, you need the Android SDK (aapt2, d8, apk
 
 ---
 *Developed with ❤️ by JaimeGH.*
+*vreadme1.0*
+eGH.*
 *vreadme1.0*

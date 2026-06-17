@@ -1,0 +1,32 @@
+post_install() {
+  echo ">>> Setting up Python virtual environment for DroidTux..."
+  echo ">>> Configurando entorno virtual de Python para DroidTux..."
+  
+  VENV_DIR="/usr/local/share/droidtux/venv"
+  if [ ! -d "$VENV_DIR" ]; then
+      python3 -m venv --system-site-packages "$VENV_DIR"
+  fi
+  
+  "$VENV_DIR/bin/pip" install --upgrade pip wheel
+  "$VENV_DIR/bin/pip" install "cryptography<47" androguard Pillow requests beautifulsoup4 fastapi uvicorn python-multipart jinja2
+
+  # Reload udev rules
+  # Recargar reglas de udev
+  udevadm control --reload-rules && udevadm trigger
+
+  # Update desktop database and icon cache
+  # Actualizar base de datos de escritorio y caché de iconos
+  update-desktop-database /usr/share/applications || true
+  gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
+}
+
+post_upgrade() {
+  post_install
+}
+
+post_remove() {
+  echo ">>> Cleaning up DroidTux files..."
+  echo ">>> Limpiando archivos de DroidTux..."
+  rm -rf /usr/local/share/droidtux/venv
+  update-desktop-database /usr/share/applications || true
+}
