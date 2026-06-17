@@ -183,11 +183,12 @@ PACMAN_DEPS=(
 
 build_package() {
     local target=$1
-    local deps=("${@:2}")
+    local arch=$2
+    local deps=("${@:3}")
     
-    echo "[*] Generating $target package..."
+    echo "[*] Generating $target ($arch) package..."
     
-    fpm_cmd=(fpm -s dir -t "$target" -n droidtux -v "$VERSION" \
+    fpm_cmd=(fpm -s dir -t "$target" -n droidtux -v "$VERSION" -a "$arch" \
         --after-install "$BUILD_DIR/after-install.sh" \
         --after-remove "$BUILD_DIR/after-remove.sh" \
         -C "$STAGING_DIR")
@@ -203,13 +204,13 @@ build_package() {
 }
 
 # Build for Debian
-build_package "deb" "${DEB_DEPS[@]}"
+build_package "deb" "all" "${DEB_DEPS[@]}"
 
 # Build for Fedora (RPM)
-build_package "rpm" "${RPM_DEPS[@]}"
+build_package "rpm" "noarch" "${RPM_DEPS[@]}"
 
 # Build for Arch Linux (Pacman)
 # Note: fpm might need 'bsdtar' and 'zstd' installed for pacman target
-build_package "pacman" "${PACMAN_DEPS[@]}"
+build_package "pacman" "any" "${PACMAN_DEPS[@]}"
 
 echo "[+] Packaging complete!"

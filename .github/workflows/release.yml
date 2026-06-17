@@ -72,8 +72,8 @@ jobs:
           VERSION="${{ needs.build-and-release.outputs.version }}"
           BASE_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}"
           
-          # Nombres de archivo generados por fpm
-          DEB_FILE="droidtux_${VERSION}_amd64.deb"
+          # Nombres de archivo generados por fpm con arquitecturas explícitas
+          DEB_FILE="droidtux_${VERSION}_all.deb"
           RPM_FILE="droidtux-${VERSION}-1.noarch.rpm"
           ARCH_FILE="droidtux-${VERSION}-1-any.pkg.tar.zst"
           
