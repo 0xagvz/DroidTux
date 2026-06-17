@@ -8,6 +8,7 @@
   <a href="#english">English</a> | <a href="#español">Español</a>
 </p>
 
+
 ---
 
 ## Español
@@ -96,6 +97,4 @@ To manually compile the Android bridge, you need the Android SDK (aapt2, d8, apk
 
 ---
 *Developed with ❤️ by JaimeGH.*
-*vreadme1.0*
-eGH.*
-*vreadme1.0*
+*vreadme1.2*
