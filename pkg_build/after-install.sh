@@ -13,14 +13,7 @@ fi
 cp /usr/local/share/droidtux/99-android-integrator.rules /etc/udev/rules.d/ 2>/dev/null || true
 udevadm control --reload-rules && udevadm trigger
 
-# Setup APT Repository (Debian/Ubuntu)
-if [ -d /etc/apt/sources.list.d ]; then
-    echo "Configuring DroidTux APT repository..."
-    KEYRING="/usr/share/keyrings/inled-archive-keyring.gpg"
-    curl -fsSL https://apt.inled.es/archive.key | gpg --dearmor -o "$KEYRING" || \
-    wget -qO- https://apt.inled.es/archive.key | gpg --dearmor -o "$KEYRING"
-    echo "deb [signed-by=$KEYRING] https://apt.inled.es stable main" > /etc/apt/sources.list.d/inled.list
-fi
+
 
 # Setup RPM Repository (Fedora/RHEL/openSUSE)
 if [ -d /etc/yum.repos.d ]; then
