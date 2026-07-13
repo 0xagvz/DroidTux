@@ -56,3 +56,6 @@ To manually compile the Android bridge, you need the Android SDK (aapt2, d8, apk
 ---
 *Developed by JaimeGH.*
 *vreadme1.2.1*
+
+> [!NOTE]
+> This project was developed with the assistance of Artificial Intelligence (AI) for coding, and all the code and its operations have been thoroughly reviewed and tested.
