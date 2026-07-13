@@ -8,7 +8,7 @@ License:        MIT
 URL:            https://github.com/nexu-io
 Source0:        %{name}-%{version}.tar.gz
 
-Requires:       scrcpy android-tools python3 python3-gobject python3-tkinter curl gnupg2 sudo
+Requires:       scrcpy android-tools python3-gobject desktop-file-utils sudo
 BuildArch:      noarch
 
 %description
@@ -55,8 +55,8 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/app_integrator.py --add
-ExecStop=/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/app_integrator.py --remove
+ExecStart=/usr/bin/python3 /usr/local/share/droidtux/app_integrator.py --add
+ExecStop=/usr/bin/python3 /usr/local/share/droidtux/app_integrator.py --remove
 KillMode=process
 TimeoutStopSec=5
 
@@ -90,13 +90,13 @@ chmod +x %{buildroot}/usr/local/bin/android-integrator-trigger.sh
 
 # Create wrapper scripts
 # Crear scripts envoltorios
-cat > %{buildroot}/usr/local/bin/droidtux-sync" << 'EOF'
+cat > %{buildroot}/usr/local/bin/droidtux-sync << 'EOF'
 #!/bin/bash
-/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/app_integrator.py "$@"
+/usr/bin/python3 /usr/local/share/droidtux/app_integrator.py "$@"
 EOF
-cat > %{buildroot}/usr/local/bin/droidtux-settings" << 'EOF'
+cat > %{buildroot}/usr/local/bin/droidtux-settings << 'EOF'
 #!/bin/bash
-/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/droidtux_settings.py "$@"
+/usr/bin/python3 /usr/local/share/droidtux/droidtux_settings.py "$@"
 EOF
 chmod +x %{buildroot}/usr/local/bin/droidtux-sync
 chmod +x %{buildroot}/usr/local/bin/droidtux-settings
@@ -127,13 +127,6 @@ Categories=Settings;
 EOF
 
 %post
-# Setup Python Virtual Environment
-VENV_DIR="/usr/local/share/droidtux/venv"
-if [ ! -d "$VENV_DIR" ]; then
-    python3 -m venv --system-site-packages "$VENV_DIR"
-fi
-"$VENV_DIR/bin/pip" install --upgrade pip wheel
-"$VENV_DIR/bin/pip" install "cryptography<47" androguard Pillow requests beautifulsoup4 fastapi uvicorn python-multipart jinja2
 
 # Setup RPM Repository
 if [ -d /etc/yum.repos.d ]; then
@@ -156,7 +149,6 @@ update-desktop-database /usr/share/applications || true
 gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
 
 %postun
-rm -rf /usr/local/share/droidtux/venv
 update-desktop-database /usr/share/applications || true
 
 %files
@@ -171,5 +163,5 @@ update-desktop-database /usr/share/applications || true
 /usr/share/applications/droidtux_settings.desktop
 
 %changelog
-* Wed Jun 17 2026 Jaime <jaime@example.com> - 1.0.0-1
+* Wed Jun 17 2026 Jaime <hi@inled.es> - 1.0.0-1
 - Initial release for Fedora

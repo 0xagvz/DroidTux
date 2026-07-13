@@ -1,9 +1,0 @@
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=DroidTux Sync
-Comment=Sync your Android apps
-Exec=/usr/local/bin/droidtux-sync
-Icon=droidtux
-Terminal=false
-Categories=Utility;

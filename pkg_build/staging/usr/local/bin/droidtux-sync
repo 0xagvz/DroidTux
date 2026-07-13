@@ -1,2 +1,0 @@
-#!/bin/bash
-/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/app_integrator.py "$@"

@@ -5,8 +5,8 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/share/droidtux/venv/bin/python3 %h/.local/bin/app_integrator.py --add
-ExecStop=%h/.local/share/droidtux/venv/bin/python3 %h/.local/bin/app_integrator.py --remove
+ExecStart=/usr/bin/python3 %h/.local/bin/app_integrator.py --add
+ExecStop=/usr/bin/python3 %h/.local/bin/app_integrator.py --remove
 KillMode=process
 TimeoutStopSec=5
 

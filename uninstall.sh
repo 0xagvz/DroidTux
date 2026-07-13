@@ -17,13 +17,13 @@ pkexec rm -f /usr/share/keyrings/inled-archive-keyring.gpg
 pkexec udevadm control --reload-rules
 
 # 3. Eliminar archivos y entorno del usuario
-echo "[3/4] Eliminando entorno de Python y configuración de usuario..."
+echo "[3/4] Eliminando archivos locales y configuración de usuario..."
 rm -f "$HOME/.local/bin/app_integrator.py"
 rm -f "$HOME/.local/bin/droidtux_settings.py"
 rm -f "$HOME/.local/bin/droidtux-bridge-final.apk"
 rm -f "$HOME/.config/systemd/user/android-integrator.service"
 rm -f "$HOME/.local/share/icons/droidtux.png"
-rm -rf "$HOME/.local/share/droidtux"  # Esto borra el venv y su carpeta
+rm -rf "$HOME/.local/share/droidtux"  # Eliminar directorio de la aplicación
 systemctl --user daemon-reload
 
 # 4. Limpiar caché generada (.desktop e iconos)

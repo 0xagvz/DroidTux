@@ -18,32 +18,20 @@ fi
 
 # 1. Check and install system dependencies
 echo "[1/4] Installing system dependencies (requires pkexec)..."
-if command -v apt-get >/dev/null; then
-    pkexec apt-get update
-    pkexec apt-get install -y scrcpy adb python3-pip python3-venv desktop-file-utils python3-tk curl gnupg
+if command -v pacman >/dev/null; then
+    pkexec pacman -S --noconfirm scrcpy android-tools python-gobject desktop-file-utils
 elif command -v dnf >/dev/null; then
-    pkexec dnf install -y scrcpy android-tools python3-pip desktop-file-utils python3-tkinter
-elif command -v pacman >/dev/null; then
-    pkexec pacman -S --noconfirm scrcpy android-tools python-pip desktop-file-utils tk
+    pkexec dnf install -y scrcpy android-tools python3-gobject desktop-file-utils
+elif command -v apt-get >/dev/null; then
+    pkexec apt-get update
+    pkexec apt-get install -y scrcpy adb python3-gi desktop-file-utils
 else
-    echo "Unsupported package manager. Please ensure scrcpy, adb, python3, and venv are installed."
+    echo "Unsupported package manager. Please ensure scrcpy, adb, python3, and pygobject (gi) are installed."
 fi
 
-# 2. Configure Python virtual environment
-echo "[2/4] Configuring Python virtual environment..."
-VENV_DIR="$HOME/.local/share/droidtux/venv"
-mkdir -p "$HOME/.local/share/droidtux"
-
+# 2. Setup paths and copy files
+echo "[2/4] Setting up paths..."
 SYSTEM_PYTHON="/usr/bin/python3"
-
-if [ -d "$VENV_DIR" ]; then
-    echo "Cleaning previous environment..."
-    rm -rf "$VENV_DIR"
-fi
-
-$SYSTEM_PYTHON -m venv --system-site-packages "$VENV_DIR"
-"$VENV_DIR/bin/pip" install --upgrade pip wheel
-"$VENV_DIR/bin/pip" install "cryptography<47" androguard Pillow requests beautifulsoup4 fastapi uvicorn python-multipart jinja2
 
 # Install scripts
 mkdir -p "$HOME/.local/bin"
@@ -80,7 +68,7 @@ Version=1.0
 Type=Application
 Name=DroidTux Sync
 Comment=Sync your Android apps
-Exec=$VENV_DIR/bin/python3 $HOME/.local/bin/app_integrator.py
+Exec=$SYSTEM_PYTHON $HOME/.local/bin/app_integrator.py
 Icon=$HOME/.local/share/icons/droidtux.png
 Terminal=false
 Categories=Utility;
@@ -93,7 +81,7 @@ Version=1.0
 Type=Application
 Name=DroidTux Settings
 Comment=Configure DroidTux
-Exec=$VENV_DIR/bin/python3 $HOME/.local/bin/droidtux_settings.py
+Exec=$SYSTEM_PYTHON $HOME/.local/bin/droidtux_settings.py
 Icon=$HOME/.local/share/icons/droidtux.png
 Terminal=false
 Categories=Settings;

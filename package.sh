@@ -40,8 +40,8 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/app_integrator.py --add
-ExecStop=/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/app_integrator.py --remove
+ExecStart=/usr/bin/python3 /usr/local/share/droidtux/app_integrator.py --add
+ExecStop=/usr/bin/python3 /usr/local/share/droidtux/app_integrator.py --remove
 KillMode=process
 TimeoutStopSec=5
 
@@ -109,12 +109,12 @@ EOF
 # Create wrapper scripts for /usr/local/bin
 cat > "$STAGING_DIR/usr/local/bin/droidtux-sync" << 'EOF'
 #!/bin/bash
-/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/app_integrator.py "$@"
+/usr/bin/python3 /usr/local/share/droidtux/app_integrator.py "$@"
 EOF
 
 cat > "$STAGING_DIR/usr/local/bin/droidtux-settings" << 'EOF'
 #!/bin/bash
-/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/droidtux_settings.py "$@"
+/usr/bin/python3 /usr/local/share/droidtux/droidtux_settings.py "$@"
 EOF
 
 chmod +x "$STAGING_DIR/usr/local/bin/droidtux-sync"
@@ -124,14 +124,6 @@ chmod +x "$STAGING_DIR/usr/local/bin/droidtux-settings"
 cat > "$BUILD_DIR/after-install.sh" << 'EOF'
 #!/bin/bash
 set -e
-
-# Setup Python Virtual Environment
-VENV_DIR="/usr/local/share/droidtux/venv"
-if [ ! -d "$VENV_DIR" ]; then
-    python3 -m venv --system-site-packages "$VENV_DIR"
-fi
-"$VENV_DIR/bin/pip" install --upgrade pip wheel
-"$VENV_DIR/bin/pip" install "cryptography<47" androguard Pillow requests beautifulsoup4 fastapi uvicorn python-multipart jinja2
 
 # Force Udev rules (in case the package manager didn't install them correctly)
 cp /usr/local/share/droidtux/99-android-integrator.rules /etc/udev/rules.d/ 2>/dev/null || true
@@ -163,15 +155,15 @@ echo "[*] Building packages..."
 
 # Dependencies mapping
 DEB_DEPS=(
-    "scrcpy" "adb" "python3-venv" "python3-gi" "python3-tk" "curl" "gnupg" "sudo"
+    "scrcpy" "adb" "python3-gi" "desktop-file-utils" "sudo"
 )
 
 RPM_DEPS=(
-    "scrcpy" "android-tools" "python3" "python3-gobject" "python3-tkinter" "curl" "gnupg2" "sudo"
+    "scrcpy" "android-tools" "python3-gobject" "desktop-file-utils" "sudo"
 )
 
 PACMAN_DEPS=(
-    "scrcpy" "android-tools" "python" "python-gobject" "tk" "curl" "gnupg" "sudo"
+    "scrcpy" "android-tools" "python-gobject" "desktop-file-utils" "sudo"
 )
 
 build_package() {

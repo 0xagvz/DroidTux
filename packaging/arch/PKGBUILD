@@ -9,8 +9,7 @@ pkgdesc_es="Integrador de Aplicaciones Android - Integra tus aplicaciones de And
 arch=('any')
 url="https://github.com/InledGroup/DroidTux"
 license=('MIT')
-depends=('scrcpy' 'android-tools' 'python' 'python-gobject' 'tk' 'curl' 'gnupg' 'sudo')
-makedepends=('python-pip' 'python-setuptools')
+depends=('scrcpy' 'android-tools' 'python-gobject' 'desktop-file-utils' 'sudo')
 install=droidtux.install
 
 # We use the local files for building the package
@@ -78,11 +77,11 @@ EOF
   # Crear scripts envoltorios
   cat > "$pkgdir/usr/local/bin/droidtux-sync" << 'EOF'
 #!/bin/bash
-/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/app_integrator.py "$@"
+/usr/bin/python3 /usr/local/share/droidtux/app_integrator.py "$@"
 EOF
   cat > "$pkgdir/usr/local/bin/droidtux-settings" << 'EOF'
 #!/bin/bash
-/usr/local/share/droidtux/venv/bin/python3 /usr/local/share/droidtux/droidtux_settings.py "$@"
+/usr/bin/python3 /usr/local/share/droidtux/droidtux_settings.py "$@"
 EOF
   chmod +x "$pkgdir/usr/local/bin/droidtux-sync"
   chmod +x "$pkgdir/usr/local/bin/droidtux-settings"

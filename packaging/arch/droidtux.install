@@ -1,13 +1,4 @@
 post_install() {
-  echo ">>> Setting up Python virtual environment for DroidTux..."
-  echo ">>> Configurando entorno virtual de Python para DroidTux..."
-  
-  VENV_DIR="/usr/local/share/droidtux/venv"
-  if [ ! -d "$VENV_DIR" ]; then
-      python3 -m venv --system-site-packages "$VENV_DIR"
-  fi
-  
-  "$VENV_DIR/bin/pip" install --upgrade pip wheel
   # Configure Pacman Repository
   # Configurar repositorio de Pacman
   if [ -f /etc/pacman.conf ] && ! grep -q "\[inled\]" /etc/pacman.conf; then
@@ -38,6 +29,5 @@ post_upgrade() {
 post_remove() {
   echo ">>> Cleaning up DroidTux files..."
   echo ">>> Limpiando archivos de DroidTux..."
-  rm -rf /usr/local/share/droidtux/venv
   update-desktop-database /usr/share/applications || true
 }
