@@ -28,3 +28,9 @@ android_apps/
 # Local configuration
 settings.json
 droidtux_settings.py.bak
+
+# Generated packages
+*.deb
+*.rpm
+*.pkg.tar.zst
+*.pacman

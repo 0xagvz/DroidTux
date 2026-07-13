@@ -11,8 +11,8 @@ STAGING_DIR="$BUILD_DIR/staging"
 echo "[*] Starting packaging process v$VERSION..."
 
 # 1. Build the Bridge APK
-echo "[*] Building Bridge APK..."
-./build_bridge.sh
+echo "[*] Skipping building Bridge APK..."
+# ./build_bridge.sh
 
 # 2. Prepare Staging Area
 rm -rf "$BUILD_DIR"
@@ -26,7 +26,11 @@ mkdir -p "$STAGING_DIR/usr/lib/systemd/user"
 # Copy files
 cp app_integrator.py "$STAGING_DIR/usr/local/share/droidtux/"
 cp droidtux_settings.py "$STAGING_DIR/usr/local/share/droidtux/"
-cp droidtux-bridge-final.apk "$STAGING_DIR/usr/local/share/droidtux/"
+if [ -f droidtux-bridge-final.apk ]; then
+    cp droidtux-bridge-final.apk "$STAGING_DIR/usr/local/share/droidtux/"
+else
+    echo "[-] Warning: droidtux-bridge-final.apk not found, skipping"
+fi
 cp droidtux.png "$STAGING_DIR/usr/local/share/droidtux/"
 cp droidtux.png "$STAGING_DIR/usr/share/icons/hicolor/512x512/apps/droidtux.png"
 cp 99-android-integrator.rules "$STAGING_DIR/etc/udev/rules.d/"
