@@ -52,9 +52,15 @@ def load_settings():
     if SETTINGS_FILE.exists():
         try:
             with open(SETTINGS_FILE, 'r') as f:
-                return json.load(f)
+                return {
+                    "resolution": "1280x720",
+                    "dpi": 240,
+                    "bitrate": "16M",
+                    "auto_sync": False,
+                    **json.load(f),
+                }
         except: pass
-    return {"resolution": "1280x720", "dpi": 240, "bitrate": "16M"}
+    return {"resolution": "1280x720", "dpi": 240, "bitrate": "16M", "auto_sync": False}
 
 class DroidTuxApp(Gtk.Window):
     def __init__(self):
@@ -582,6 +588,11 @@ if __name__ == "__main__":
         sys.exit(0)
     
     if args.add:
+        settings = load_settings()
+        if not settings.get("auto_sync", False):
+            print("Automatic sync is disabled in DroidTux settings.")
+            sys.exit(0)
+
         print("Starting automatic sync (Splash Mode)...")
         app = DroidTuxApp()
         app.automatic = True
